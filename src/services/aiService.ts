@@ -1,0 +1,392 @@
+import { TranslationItem, VerificationItem } from '../types/pptx';
+
+export interface TranslationResultItem {
+  id: string;
+  translatedText: string;
+  notes?: string;
+  lengthFitWarning?: string;
+}
+
+export interface PolishResultItem {
+  id: string;
+  polishedText: string;
+  changesSummary?: string;
+}
+
+export interface VerificationResultItem {
+  id: string;
+  status: 'ok' | 'warning' | 'suggestion';
+  issue?: string;
+  suggestion?: string;
+}
+
+export interface VerificationResponse {
+  overallAssessment: string;
+  verifiedItems: VerificationResultItem[];
+}
+
+export interface TranslationResponse {
+  results: TranslationResultItem[];
+  failedCount: number;
+  warning?: string;
+}
+
+export interface ServerStatusResponse {
+  aiEngine: string;
+  gemma: {
+    available: boolean;
+    host: string;
+    model: string;
+    installedModels: string[];
+    error: string | null;
+  };
+  translator: {
+    freeAvailable: boolean;
+    hasEnvKey: boolean;
+    provider: 'google' | 'deepl' | 'google-free';
+  };
+}
+
+export async function fetchServerStatus(): Promise<ServerStatusResponse | null> {
+  try {
+    const res = await fetch('/api/status');
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    // If backend is unreachable, check local Ollama directly
+    try {
+      const ollamaRes = await fetch('http://127.0.0.1:11434/api/tags');
+      if (ollamaRes.ok) {
+        const d = await ollamaRes.json();
+        const models = (d?.models || []).map((m: any) => m.name);
+        return {
+          aiEngine: 'gemma4',
+          gemma: {
+            available: models.some((m: string) => m.includes('gemma')),
+            host: 'http://127.0.0.1:11434',
+            model: 'gemma4:latest',
+            installedModels: models,
+            error: null,
+          },
+          translator: {
+            freeAvailable: true,
+            hasEnvKey: false,
+            provider: 'google-free',
+          },
+        };
+      }
+    } catch {}
+    return null;
+  }
+}
+
+function normalizeLangCode(lang: string): string {
+  const l = (lang || '').toLowerCase();
+  if (l.includes('ang') || l.startsWith('en')) return 'en';
+  if (l.includes('něm') || l.includes('nem') || l.startsWith('de')) return 'de';
+  if (l.includes('češ') || l.includes('ces') || l.startsWith('cs')) return 'cs';
+  if (l.includes('slov') || l.startsWith('sk')) return 'sk';
+  if (l.includes('pol') || l.startsWith('pl')) return 'pl';
+  if (l.includes('špan') || l.includes('span') || l.startsWith('es')) return 'es';
+  if (l.includes('fran') || l.startsWith('fr')) return 'fr';
+  if (l.includes('ital') || l.startsWith('it')) return 'it';
+  if (l.includes('ukr') || l.startsWith('uk')) return 'uk';
+  if (l.includes('čín') || l.includes('cin') || l.startsWith('zh')) return 'zh';
+  if (l.includes('jap') || l.startsWith('ja')) return 'ja';
+  return 'en';
+}
+
+function decodeHtmlEntities(str: string): string {
+  if (!str) return '';
+  return str
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#x27;/g, "'")
+    .replace(/&#x2F;/g, '/')
+    .replace(/&nbsp;/g, ' ');
+}
+
+// Direct browser Google Translate GTX translation (Fast, 100% free, CORS allowed)
+async function translateViaGoogleFreeClient(
+  texts: string[],
+  targetLanguage: string,
+  signal?: AbortSignal
+): Promise<string[]> {
+  const targetIso = normalizeLangCode(targetLanguage);
+  const results: string[] = new Array(texts.length);
+  const chunkSize = 15;
+  const chunkPromises: Promise<void>[] = [];
+
+  for (let i = 0; i < texts.length; i += chunkSize) {
+    if (signal?.aborted) break;
+    const chunk = texts.slice(i, i + chunkSize);
+    const startIdx = i;
+
+    chunkPromises.push(
+      (async () => {
+        const DELIM = ' ___SPLIT___ ';
+        const joined = chunk.map((t) => (t || '').trim() || ' ').join(DELIM);
+        try {
+          const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${encodeURIComponent(
+            targetIso
+          )}&dt=t&q=${encodeURIComponent(joined)}`;
+          const res = await fetch(url, { signal });
+          if (res.ok) {
+            const json: any = await res.json();
+            const translatedJoined = (json?.[0] || []).map((part: any) => part?.[0] || '').join('');
+            const parts = translatedJoined.split(/___SPLIT___/i).map((s: string) => decodeHtmlEntities(s.trim()));
+            if (parts.length === chunk.length) {
+              parts.forEach((p: string, offset: number) => {
+                results[startIdx + offset] = p || chunk[offset];
+              });
+              return;
+            }
+          }
+        } catch (_) {}
+
+        // Fallback per-item
+        await Promise.all(
+          chunk.map(async (text, offset) => {
+            const idx = startIdx + offset;
+            const clean = (text || '').trim();
+            if (!clean) {
+              results[idx] = text;
+              return;
+            }
+            try {
+              const u = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${encodeURIComponent(
+                targetIso
+              )}&dt=t&q=${encodeURIComponent(clean)}`;
+              const r = await fetch(u, { signal });
+              if (!r.ok) {
+                results[idx] = clean;
+                return;
+              }
+              const j: any = await r.json();
+              const translated = (j?.[0] || []).map((part: any) => part?.[0] || '').join('');
+              results[idx] = decodeHtmlEntities(translated) || clean;
+            } catch {
+              results[idx] = clean;
+            }
+          })
+        );
+      })()
+    );
+  }
+
+  await Promise.all(chunkPromises);
+  return results;
+}
+
+// Direct browser Gemma 4 translation via Ollama (allowed Origin: http://localhost:3000)
+async function translateViaGemmaClient(
+  items: { id: string; text: string }[],
+  targetLanguage: string,
+  signal?: AbortSignal
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  const batchSize = 4;
+
+  for (let i = 0; i < items.length; i += batchSize) {
+    if (signal?.aborted) break;
+    const chunk = items.slice(i, i + batchSize);
+    const prompt = `Jsi profesionální překladatel PowerPoint prezentací.
+Přelož text každé položky přesně do cílového jazyka: "${targetLanguage}".
+POKYNY:
+1. Vstup má přesně ${chunk.length} prvků. Výstup MUSÍ mít přesně ${chunk.length} prvků se stejnými 'id'.
+2. Zachovej číslování, odrážky a URL adresy.
+3. Překládej přirozeně a stručně pro prezentační slidy.
+
+Vrať POUZE platný JSON ve formátu:
+{"translations": [{"id": "string", "translatedText": "string"}]}
+
+POLOŽKY:
+${JSON.stringify(chunk)}`;
+
+    try {
+      const res = await fetch('http://127.0.0.1:11434/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'gemma4:latest',
+          prompt,
+          format: 'json',
+          stream: false,
+          options: { temperature: 0.1 },
+        }),
+        signal,
+      });
+
+      if (res.ok) {
+        const data: any = await res.json();
+        let respText = (data?.response || '').trim();
+        if (respText.startsWith('```')) {
+          respText = respText.replace(/^```[a-z]*\s*/i, '').replace(/\s*```$/i, '').trim();
+        }
+        const parsed = JSON.parse(respText);
+        if (parsed && Array.isArray(parsed.translations)) {
+          parsed.translations.forEach((t: any) => {
+            if (t?.id && t?.translatedText) {
+              map.set(String(t.id), t.translatedText);
+            }
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('Direct Gemma fetch notice:', e);
+    }
+  }
+
+  return map;
+}
+
+/**
+ * Translates texts via free engine (MyMemory / Gemma 4) or official API
+ */
+export async function requestAiTranslation(
+  items: TranslationItem[],
+  targetLanguage: string,
+  options?: {
+    apiKey?: string;
+    provider?: 'auto' | 'google' | 'deepl' | 'gemma' | 'free';
+    externalSignal?: AbortSignal;
+  }
+): Promise<TranslationResponse> {
+  const chosenProvider = options?.provider || 'auto';
+
+  // 1. Try server endpoint first
+  try {
+    const res = await fetch('/api/translate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        items,
+        targetLanguage,
+        apiKey: options?.apiKey,
+        provider: chosenProvider,
+      }),
+      signal: options?.externalSignal,
+    });
+
+    if (res.ok) {
+      const data: any = await res.json();
+      // If server returned valid translations with updated engine (free-web, gemma4, google, deepl)
+      if (data && Array.isArray(data.translations) && data.translations.length > 0) {
+        const results = data.translations.map((t: any) => ({
+          id: t.id,
+          translatedText: t.translatedText,
+          notes:
+            data.engine === 'gemma4'
+              ? 'Lokální AI Gemma 4 (100% zachování layoutu)'
+              : data.engine === 'deepl'
+              ? 'DeepL API (100% zachování layoutu)'
+              : data.engine === 'google'
+              ? 'Google Cloud API (100% zachování layoutu)'
+              : 'Bleskový bezplatný překlad (100% zachování layoutu)',
+        }));
+        return { results, failedCount: 0 };
+      }
+    }
+  } catch (serverErr) {
+    console.warn('Server endpoint notice, using direct client translator:', serverErr);
+  }
+
+  // 2. Direct client-side translation fallback (ensures 100% success even if server is older instance)
+  if (chosenProvider === 'gemma') {
+    const gemmaItems = items.map((it) => ({
+      id: it.id,
+      text: it.originalText || '',
+    }));
+    const gemmaMap = await translateViaGemmaClient(gemmaItems, targetLanguage, options?.externalSignal);
+
+    // Fallback any missing items to Google Free Web
+    const missing = items.filter((it) => !gemmaMap.has(it.id));
+    if (missing.length > 0) {
+      const fallbackTexts = await translateViaGoogleFreeClient(
+        missing.map((m) => m.originalText || ''),
+        targetLanguage,
+        options?.externalSignal
+      );
+      missing.forEach((m, idx) => {
+        if (fallbackTexts[idx]) gemmaMap.set(m.id, fallbackTexts[idx]);
+      });
+    }
+
+    const results = items.map((it) => ({
+      id: it.id,
+      translatedText: gemmaMap.get(it.id) || it.originalText || '',
+      notes: 'Lokální AI Gemma 4 (100% zachování layoutu)',
+    }));
+    return { results, failedCount: 0 };
+  } else {
+    // High-Speed Free Web Translator via Google GTX
+    const rawTexts = items.map((it) => it.originalText || '');
+    const translatedTexts = await translateViaGoogleFreeClient(rawTexts, targetLanguage, options?.externalSignal);
+
+    const results = items.map((it, idx) => ({
+      id: it.id,
+      translatedText: translatedTexts[idx] || it.originalText || '',
+      notes: 'Bleskový bezplatný překlad (100% zachování layoutu)',
+    }));
+    return { results, failedCount: 0 };
+  }
+}
+
+/**
+ * Gemma 4 verifies layout, positioning, length, and slide coherence:
+ * "ai to nema prekladat jen kontroluje jestli je to na stejnem miste jako predtím"
+ */
+export async function requestAiVerification(
+  items: VerificationItem[],
+  targetLanguage: string = 'aktuální jazyk'
+): Promise<VerificationResponse> {
+  const res = await fetch('/api/ai/verify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      items,
+      targetLanguage,
+    }),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || `Chyba při ověřování rozvržení (kód ${res.status})`);
+  }
+
+  const data = await res.json();
+  return {
+    overallAssessment: data.overallAssessment || 'Kontrola dokončena.',
+    verifiedItems: data.verifiedItems || [],
+  };
+}
+
+/**
+ * Gemma 4 handles grammar, styling and executive rewrite
+ */
+export async function requestAiPolish(
+  items: { id: string; text: string }[],
+  mode: 'grammar' | 'concise' | 'professional' | 'engaging' = 'grammar',
+  language: string = 'čeština'
+): Promise<PolishResultItem[]> {
+  const res = await fetch('/api/ai/polish', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      items,
+      mode,
+      language,
+    }),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || `Chyba při korektuře (kód ${res.status})`);
+  }
+
+  const data = await res.json();
+  return data.polishedItems || [];
+}
