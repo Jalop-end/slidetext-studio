@@ -19,8 +19,10 @@ import { BilingualExportModal } from './components/BilingualExportModal';
 import { PreSaveComparisonModal } from './components/PreSaveComparisonModal';
 import { TranslationResultItem, PolishResultItem } from './services/aiService';
 import { CheckCircle2, Download, AlertCircle } from 'lucide-react';
+import { useLanguage } from './context/LanguageContext';
 
 export default function App() {
+  const { t } = useLanguage();
   const [document, setDocument] = useState<PptxDocument | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [loadingMessage, setLoadingMessage] = useState<string>('');
@@ -49,7 +51,7 @@ export default function App() {
       const nextIdx = historyIndex - 1;
       setHistoryIndex(nextIdx);
       setDocument(history[nextIdx]);
-      showToast('Krok vrácen zpět.');
+      showToast(t('stepUndone', 'Krok vrácen zpět.'));
     }
   };
 
@@ -58,7 +60,7 @@ export default function App() {
       const nextIdx = historyIndex + 1;
       setHistoryIndex(nextIdx);
       setDocument(history[nextIdx]);
-      showToast('Krok obnoven.');
+      showToast(t('stepRedone', 'Krok obnoven.'));
     }
   };
 
@@ -87,7 +89,7 @@ export default function App() {
   // Upload handlers
   const handleFileUpload = async (file: File) => {
     setIsLoading(true);
-    setLoadingMessage(`Načítám prezentaci ${file.name}...`);
+    setLoadingMessage(`${t('loadingPresentation', 'Načítám prezentaci...')} (${file.name})`);
     try {
       const arrayBuf = await file.arrayBuffer();
       const parsed = await parsePptxFile(arrayBuf, file.name);
@@ -133,7 +135,7 @@ export default function App() {
 
   const handleLoadSample = async (sampleType: 'czech-strategy' | 'english-pitch') => {
     setIsLoading(true);
-    setLoadingMessage('Načítám vzorovou prezentaci...');
+    setLoadingMessage(t('loadingPresentation', 'Načítám vzorovou prezentaci...'));
     try {
       const sample = await generateSamplePptx(sampleType);
       const arrayBuf = await sample.blob.arrayBuffer();
@@ -182,7 +184,7 @@ export default function App() {
   const handleRefreshRender = async () => {
     if (!document) return;
     setIsRenderingPptx(true);
-    showToast('Generuji aktuální PowerPoint náhled se všemi provedenými změnami...');
+    showToast(t('reRenderStarted', 'Generuji aktuální PowerPoint náhled se všemi provedenými změnami...'));
     try {
       const updatedBlob = await updatePptxAndExport(document.rawZip, document.slides);
       const renderedImages = await renderPptxSlidesViaBackend(updatedBlob);
@@ -195,7 +197,7 @@ export default function App() {
           }));
           return { ...prev, slides: updatedSlides };
         });
-        showToast('PowerPoint náhled byl úspěšně zaktualizován.');
+        showToast(t('reRenderSuccess', 'PowerPoint náhled byl úspěšně zaktualizován.'));
       } else {
         showToast('Náhled je aktuální.');
       }

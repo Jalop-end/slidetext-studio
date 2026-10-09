@@ -484,7 +484,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                                       target="_blank"
                                       rel="noreferrer"
                                       className="p-1 rounded text-blue-600 hover:bg-blue-100 transition-colors"
-                                      title="Otevřít odkaz"
+                                      title={t("openLink", "Otevřít odkaz")}
                                     >
                                       <ExternalLink className="w-3 h-3" />
                                     </a>
@@ -543,7 +543,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                                 {paragraph.runs[0]?.fontSizePt && (
                                   <span>
                                     ~{Math.round(paragraph.runs[0].fontSizePt)}pt
-                                    {paragraph.runs[0].isBold ? ' • Tučné' : ''}
+                                    {paragraph.runs[0].isBold ? ` • ${t('boldIndicator', 'Tučné')}` : ''}
                                   </span>
                                 )}
                               </div>

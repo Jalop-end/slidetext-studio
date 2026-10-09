@@ -102,17 +102,17 @@ export const PreSaveComparisonModal: React.FC<PreSaveComparisonModalProps> = ({
             <div className="hidden lg:flex items-center gap-2 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700/80 text-xs">
               <span className="flex items-center gap-1 text-emerald-400 font-medium">
                 <CheckCircle2 className="w-3.5 h-3.5" />
-                {modifiedParas} textů upraveno
+                {modifiedParas} {t('textsModified', 'textů upraveno')}
               </span>
               <span className="text-slate-600">•</span>
               <span className="flex items-center gap-1 text-blue-400 font-medium">
                 <LinkIcon className="w-3.5 h-3.5" />
-                {totalLinks} odkazů zachováno
+                {totalLinks} {t('linksPreserved', 'odkazů zachováno')}
               </span>
               <span className="text-slate-600">•</span>
               <span className="flex items-center gap-1 text-amber-400 font-medium">
                 <ImageIcon className="w-3.5 h-3.5" />
-                {totalImages} obrázků na pozicích
+                {totalImages} {t('imagesPositioned', 'obrázků na pozicích')}
               </span>
             </div>
 
@@ -361,7 +361,7 @@ export const PreSaveComparisonModal: React.FC<PreSaveComparisonModalProps> = ({
             </button>
 
             <span className="text-xs font-semibold text-slate-200">
-              Snímek {currentSlide.slideNumber} z {document.slides.length}
+              {t('slide')} {currentSlide.slideNumber} {t('of')} {document.slides.length}
             </span>
 
             <button
@@ -409,7 +409,7 @@ export const PreSaveComparisonModal: React.FC<PreSaveComparisonModalProps> = ({
                 value={outputFileName}
                 onChange={(e) => setOutputFileName(e.target.value)}
                 className="bg-slate-950 text-xs font-bold text-white px-2 py-1 rounded-lg border border-slate-700 focus:outline-none focus:border-orange-500 w-36 sm:w-56"
-                placeholder="Název prezentace"
+                placeholder={t('presentationNamePlaceholder', 'Název prezentace')}
               />
               <span className="text-xs text-slate-400 font-mono">.pptx</span>
             </div>

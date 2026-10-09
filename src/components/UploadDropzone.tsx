@@ -95,9 +95,8 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({
                       setLanguage(lang.code);
                       setIsLangMenuOpen(false);
                     }}
-                    className={`w-full px-3 py-1.5 text-xs text-left flex items-center justify-between hover:bg-slate-50 transition-colors ${
-                      language === lang.code ? 'font-bold text-blue-600 bg-blue-50/50' : 'text-slate-700'
-                    }`}
+                    className={`w-full px-3 py-1.5 text-xs text-left flex items-center justify-between hover:bg-slate-50 transition-colors ${language === lang.code ? 'font-bold text-blue-600 bg-blue-50/50' : 'text-slate-700'
+                      }`}
                   >
                     <span className="flex items-center gap-2">
                       <span className="text-base">{lang.flag}</span>
@@ -115,10 +114,12 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({
       <div className="max-w-3xl w-full space-y-8">
         {/* Hero Title */}
         <div className="text-center space-y-3">
+          {/*
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-orange-100/80 text-orange-800 text-xs font-bold border border-orange-200 shadow-xs mb-2">
             <Sparkles className="w-3.5 h-3.5 text-orange-600" />
             <span>PowerPoint • AI • 100% Layout</span>
           </div>
+          */}
 
           <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
             {t('dropzoneTitle')}
@@ -134,11 +135,10 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
-          className={`relative border-2 border-dashed rounded-3xl p-8 sm:p-12 text-center cursor-pointer transition-all duration-200 bg-white ${
-            isDragOver
-              ? 'border-orange-500 bg-orange-50/40 ring-4 ring-orange-500/10 scale-[1.01]'
-              : 'border-slate-300 hover:border-orange-400 hover:bg-slate-50/60 shadow-lg shadow-slate-200/50'
-          }`}
+          className={`relative border-2 border-dashed rounded-3xl p-8 sm:p-12 text-center cursor-pointer transition-all duration-200 bg-white ${isDragOver
+            ? 'border-orange-500 bg-orange-50/40 ring-4 ring-orange-500/10 scale-[1.01]'
+            : 'border-slate-300 hover:border-orange-400 hover:bg-slate-50/60 shadow-lg shadow-slate-200/50'
+            }`}
         >
           <input
             type="file"
@@ -154,10 +154,10 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({
                 <Loader2 className="w-8 h-8 animate-spin" />
               </div>
               <p className="font-bold text-slate-900 text-base">
-                {loadingMessage || 'Zpracovávám prezentaci...'}
+                {loadingMessage || t('loadingPresentation', 'Zpracovávám prezentaci...')}
               </p>
               <p className="text-xs text-slate-500">
-                Rozbaluji snímky a načítám textové bloky...
+                {t('loadingPresentation', 'Rozbaluji snímky a načítám textové bloky...')}
               </p>
             </div>
           ) : (
@@ -168,17 +168,17 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({
 
               <div>
                 <p className="font-bold text-slate-900 text-base sm:text-lg">
-                  Přetáhněte sem soubor <span className="text-orange-600">.pptx</span> nebo klikněte
+                  {t('dragDropOrClick', 'Přetáhněte sem soubor .pptx nebo klikněte')}
                 </p>
                 <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                  Podporovány jsou všechny verze Microsoft PowerPoint, Google Prezentace a LibreOffice
+                  {t('supportedFormatsDesc', 'Podporovány jsou všechny verze Microsoft PowerPoint, Google Prezentace a LibreOffice')}
                 </p>
               </div>
 
               <div className="pt-2">
                 <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs shadow-md shadow-orange-600/20 transition-all">
                   <FileText className="w-4 h-4" />
-                  Vybrat soubor z počítače
+                  {t('chooseFromComputer', 'Vybrat soubor z počítače')}
                 </span>
               </div>
             </div>
@@ -190,10 +190,10 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({
           <div className="flex items-center justify-between">
             <div>
               <h3 className="font-bold text-slate-900 text-sm">
-                Nemáte zrovna po ruce .pptx soubor?
+                {t('noFileOnHand', 'Nemáte zrovna po ruce .pptx soubor?')}
               </h3>
               <p className="text-xs text-slate-500">
-                Vyzkoušejte aplikaci okamžitě s jednou z našich připravených vzorových prezentací:
+                {t('trySampleDesc', 'Vyzkoušejte aplikaci okamžitě s jednou z našich připravených vzorových prezentací:')}
               </p>
             </div>
           </div>
@@ -207,10 +207,10 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({
             >
               <div>
                 <div className="flex items-center gap-1.5 font-bold text-xs text-slate-900 group-hover:text-orange-700">
-                  <span>🇨🇿 Česká firemní strategie 2026</span>
+                  <span>{t('sampleCzech', '🇨🇿 Firemní strategie inovací')}</span>
                 </div>
                 <p className="text-[11px] text-slate-500 mt-1">
-                  4 snímky, odrážky, podnadpisy, vhodné pro překlad do AJ/NJ a zhuštění textů
+                  {t('sampleCzechDesc', '4 snímky, odrážky, podnadpisy, vhodné pro překlad do AJ/NJ a zhuštění textů')}
                 </p>
               </div>
               <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-orange-600 shrink-0 mt-0.5 transition-transform group-hover:translate-x-0.5" />
@@ -224,10 +224,10 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({
             >
               <div>
                 <div className="flex items-center gap-1.5 font-bold text-xs text-slate-900 group-hover:text-orange-700">
-                  <span>🇬🇧 Global Enterprise AI Pitch</span>
+                  <span>{t('sampleEnglish', '🇬🇧 Global Tech Pitch 2026')}</span>
                 </div>
                 <p className="text-[11px] text-slate-500 mt-1">
-                  Anglický pitch deck, perfektní pro test lokalizace do češtiny s kontextovým auditem
+                  {t('sampleEnglishDesc', 'Anglický pitch deck, perfektní pro test lokalizace do češtiny s kontextovým auditem')}
                 </p>
               </div>
               <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-orange-600 shrink-0 mt-0.5 transition-transform group-hover:translate-x-0.5" />
@@ -242,10 +242,10 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({
               <FileCheck className="w-4 h-4" />
             </div>
             <h4 className="font-bold text-slate-900 text-xs">
-              100% zachování formátování
+              {t('featureCard1Title', '100% zachování formátování')}
             </h4>
             <p className="text-[11px] text-slate-500 leading-relaxed">
-              Mění se pouze text. Rozložení objektů, barvy, fonty a pozice zůstávají nedotčeny.
+              {t('featureCard1Desc', 'Mění se pouze text. Rozložení objektů, barvy, fonty a pozice zůstávají nedotčeny.')}
             </p>
           </div>
 
@@ -254,10 +254,10 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({
               <Layers className="w-4 h-4" />
             </div>
             <h4 className="font-bold text-slate-900 text-xs">
-              Word přehled & mini-odkazy
+              {t('featureCard2Title', 'Word přehled & mini-odkazy')}
             </h4>
             <p className="text-[11px] text-slate-500 leading-relaxed">
-              Text je přehledně vytažen do stránek s mini-odkazy pro přesné zobrazení na snímku.
+              {t('featureCard2Desc', 'Text je přehledně vytažen do stránek s mini-odkazy pro přesné zobrazení na snímku.')}
             </p>
           </div>
 
@@ -266,10 +266,10 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({
               <ShieldCheck className="w-4 h-4" />
             </div>
             <h4 className="font-bold text-slate-900 text-xs">
-              AI kontextový auditor
+              {t('featureCard3Title', 'AI kontextový auditor')}
             </h4>
             <p className="text-[11px] text-slate-500 leading-relaxed">
-              Kontroluje návaznost slov, jednotu pojmů i délku textu, aby se slide nezdeformoval.
+              {t('featureCard3Desc', 'Kontroluje návaznost slov, jednotu pojmů i délku textu, aby se slide nezdeformoval.')}
             </p>
           </div>
         </div>

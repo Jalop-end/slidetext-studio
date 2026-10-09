@@ -103,7 +103,7 @@ export const SlideVisualizer: React.FC<SlideVisualizerProps> = ({
   if (!currentSlide) {
     return (
       <div className="flex-1 flex items-center justify-center p-8 bg-slate-900 text-slate-400">
-        Žádný snímek k zobrazení.
+        {t('noSlideToDisplay', 'Žádný snímek k zobrazení.')}
       </div>
     );
   }
@@ -130,7 +130,7 @@ export const SlideVisualizer: React.FC<SlideVisualizerProps> = ({
             <button
               onClick={() => setIsDeckOpen(!isDeckOpen)}
               className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-              title={isDeckOpen ? 'Skrýt pás snímků' : 'Zobrazit pás snímků'}
+              title={isDeckOpen ? t('deckToggleHide', 'Skrýt pás snímků') : t('deckToggleShow', 'Zobrazit pás snímků')}
             >
               {isDeckOpen ? (
                 <PanelLeftClose className="w-4 h-4 text-blue-400" />
@@ -152,10 +152,10 @@ export const SlideVisualizer: React.FC<SlideVisualizerProps> = ({
           <button
             onClick={() => setModalGridOpen(true)}
             className="hidden sm:inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-blue-950/60 hover:bg-blue-900/60 text-blue-300 hover:text-white transition-colors border border-blue-800/80 font-medium"
-            title="Zobrazit celou prezentaci (všechny snímky najednou s šablonami)"
+            title={t('allSlidesModalSubtitle', 'Zobrazit celou prezentaci (všechny snímky najednou s šablonami)')}
           >
             <LayoutGrid className="w-3.5 h-3.5 text-blue-400" />
-            <span>Celá prezentace</span>
+            <span>{t('allSlidesOverview', 'Celá prezentace')}</span>
           </button>
         </div>
 
@@ -170,10 +170,10 @@ export const SlideVisualizer: React.FC<SlideVisualizerProps> = ({
                   ? 'bg-blue-600 text-white shadow-xs'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
-              title="Věrný náhled z PowerPointu (originální vzhled a šablona)"
+              title={t('authenticViewTooltip', 'Věrný náhled z PowerPointu (originální vzhled a šablona)')}
             >
               <Eye className="w-3 h-3" />
-              <span className="hidden md:inline">PowerPoint vzhled</span>
+              <span className="hidden md:inline">{t('authenticView', 'PowerPoint vzhled')}</span>
             </button>
             <button
               onClick={() => setViewMode('overlay')}
@@ -182,10 +182,10 @@ export const SlideVisualizer: React.FC<SlideVisualizerProps> = ({
                   ? 'bg-blue-600 text-white shadow-xs'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
-              title="Interaktivní náhled se zobrazením upravených textů"
+              title={t('overlayViewTooltip', 'Interaktivní náhled se zobrazením upravených textů')}
             >
               <Sparkles className="w-3 h-3 text-amber-300" />
-              <span className="hidden md:inline">S úpravami</span>
+              <span className="hidden md:inline">{t('overlayView', 'S úpravami')}</span>
             </button>
             <button
               onClick={() => setViewMode('wireframe')}
@@ -194,10 +194,10 @@ export const SlideVisualizer: React.FC<SlideVisualizerProps> = ({
                   ? 'bg-blue-600 text-white shadow-xs'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
-              title="Drátěný model rozvržení prvků"
+              title={t('wireframeViewTooltip', 'Drátěný model rozvržení prvků')}
             >
               <Sliders className="w-3 h-3" />
-              <span className="hidden xl:inline">Drátěný model</span>
+              <span className="hidden xl:inline">{t('wireframeView', 'Drátěný model')}</span>
             </button>
           </div>
 
@@ -207,11 +207,11 @@ export const SlideVisualizer: React.FC<SlideVisualizerProps> = ({
               onClick={onRefreshRender}
               disabled={isRendering}
               className="px-2.5 py-1 rounded-md text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white transition-colors border border-slate-700 flex items-center gap-1.5 disabled:opacity-50"
-              title="Vygenerovat čerstvý PowerPoint náhled se všemi textovými úpravami"
+              title={t('refreshPptxTooltip', 'Vygenerovat čerstvý PowerPoint náhled se všemi textovými úpravami')}
             >
               <RotateCw className={`w-3.5 h-3.5 text-emerald-400 ${isRendering ? 'animate-spin' : ''}`} />
               <span className="hidden sm:inline">
-                {isRendering ? 'Renderuji...' : 'Aktualizovat PowerPoint'}
+                {isRendering ? t('renderingStatus', 'Renderuji...') : t('refreshPptxBtn', 'Aktualizovat PowerPoint')}
               </span>
             </button>
           )}
@@ -221,21 +221,21 @@ export const SlideVisualizer: React.FC<SlideVisualizerProps> = ({
             <button
               onClick={() => setZoomLevel((z) => Math.max(50, z - 15))}
               className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800"
-              title="Oddálit"
+              title={t('zoomOut', 'Oddálit')}
             >
               <ZoomOut className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={() => setZoomLevel(100)}
               className="px-1.5 text-[10px] font-mono text-slate-300 hover:text-white"
-              title="Obnovit 100%"
+              title={t('zoomReset', 'Obnovit 100%')}
             >
               {zoomLevel}%
             </button>
             <button
               onClick={() => setZoomLevel((z) => Math.min(175, z + 15))}
               className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800"
-              title="Přiblížit"
+              title={t('zoomIn', 'Přiblížit')}
             >
               <ZoomIn className="w-3.5 h-3.5" />
             </button>
@@ -249,17 +249,17 @@ export const SlideVisualizer: React.FC<SlideVisualizerProps> = ({
                 ? 'bg-orange-600 text-white shadow-xs'
                 : 'text-orange-400 hover:bg-orange-950/60 bg-orange-950/30 border border-orange-800/60'
             }`}
-            title="Spustit režim promítání na celou obrazovku"
+            title={t('projectionMode', 'Spustit režim promítání na celou obrazovku')}
           >
             <Tv className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">{isProjectionMode ? 'Ukončit (Esc)' : t('projectionMode')}</span>
+            <span className="hidden sm:inline">{isProjectionMode ? t('exitSlideshow', 'Ukončit (Esc)') : t('projectionMode')}</span>
           </button>
 
           {/* Fullscreen toggle */}
           <button
             onClick={() => setIsFullscreen(!isFullscreen)}
             className="p-1 rounded-md text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
-            title={isFullscreen ? 'Zmenšit' : t('fullscreen')}
+            title={isFullscreen ? t('exitSlideshow', 'Zmenšit') : t('fullscreen')}
           >
             {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
           </button>
@@ -623,10 +623,10 @@ export const SlideVisualizer: React.FC<SlideVisualizerProps> = ({
                 </div>
                 <div>
                   <h3 className="font-bold text-white text-base">
-                    Přehled celé prezentace ({slides.length} snímků)
+                    {t('allSlidesModalTitle', 'Přehled celé prezentace')} ({slides.length} {t('slidesCount', 'snímků')})
                   </h3>
                   <p className="text-xs text-slate-400">
-                    Prohlédněte si všechny snímky, jejich šablony, grafiku a rozvržení před stažením.
+                    {t('allSlidesModalSubtitle', 'Prohlédněte si všechny snímky, jejich šablony, grafiku a rozvržení před stažením.')}
                   </p>
                 </div>
               </div>
@@ -642,7 +642,7 @@ export const SlideVisualizer: React.FC<SlideVisualizerProps> = ({
             {isRendering && (
               <div className="mx-6 mt-4 p-3 rounded-xl bg-blue-950/80 border border-blue-500/50 text-xs text-blue-200 flex items-center gap-2.5 shadow-lg shrink-0">
                 <RotateCw className="w-4 h-4 text-blue-400 animate-spin shrink-0" />
-                <span>Právě probíhá export věrných náhledů z Microsoft PowerPointu (Full HD 1920x1080). Náhledy se na této stránce automaticky aktualizují.</span>
+                <span>{t('allSlidesExportingBanner', 'Právě probíhá export věrných náhledů z Microsoft PowerPointu (Full HD 1920x1080). Náhledy se na této stránce automaticky aktualizují.')}</span>
               </div>
             )}
 

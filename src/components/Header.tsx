@@ -113,7 +113,7 @@ export const Header: React.FC<HeaderProps> = ({
                     onBlur={handleSaveName}
                     autoFocus
                     className="text-xs font-bold text-slate-900 bg-white px-2 py-0.5 rounded focus:outline-none w-36 sm:w-52"
-                    placeholder="Název prezentace"
+                    placeholder={t('presentationNamePlaceholder', 'Název prezentace')}
                   />
                   <button
                     type="button"
@@ -309,10 +309,10 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 onClick={onOpenGallery}
                 className="px-2.5 py-1 text-xs font-semibold rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors flex items-center gap-1.5 shadow-2xs"
-                title="Zobrazit přehled všech snímků celé prezentace (všechny šablony a styly)"
+                title={t('allSlidesModalSubtitle', 'Zobrazit přehled všech snímků celé prezentace (všechny šablony a styly)')}
               >
                 <LayoutGrid className="w-3.5 h-3.5" />
-                <span>Celá prezentace</span>
+                <span>{t('allSlidesOverview', 'Celá prezentace')}</span>
               </button>
             )}
 

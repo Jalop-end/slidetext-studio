@@ -59,7 +59,7 @@ export const AiVerificationModal: React.FC<AiVerificationModalProps> = ({
     });
 
     if (items.length === 0) {
-      setError('Nebyly nalezeny žádné texty k ověření.');
+      setError(t('noTextsToVerify', 'Nebyly nalezeny žádné texty k ověření.'));
       setIsLoading(false);
       return;
     }
@@ -68,7 +68,7 @@ export const AiVerificationModal: React.FC<AiVerificationModalProps> = ({
       const result = await requestAiVerification(items, 'aktuální jazyk prezentace');
       setVerificationData(result);
     } catch (err: any) {
-      setError(err.message || 'Nepodařilo se dokončit kontextové ověření.');
+      setError(err.message || t('verificationFailed', 'Nepodařilo se dokončit kontextové ověření.'));
     } finally {
       setIsLoading(false);
     }
@@ -83,7 +83,7 @@ export const AiVerificationModal: React.FC<AiVerificationModalProps> = ({
         return {
           ...prev,
           verifiedItems: prev.verifiedItems.map((vi) =>
-            vi.id === item.id ? { ...vi, status: 'ok', issue: 'Oprava aplikována' } : vi
+            vi.id === item.id ? { ...vi, status: 'ok', issue: t('auditFixApplied', 'Oprava aplikována') } : vi
           ),
         };
       });
@@ -129,46 +129,46 @@ export const AiVerificationModal: React.FC<AiVerificationModalProps> = ({
             <div className="space-y-4">
               <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 space-y-3">
                 <p className="font-semibold text-slate-900 text-sm">
-                  Co přesně tento audit zkontroluje?
+                  {t('auditWhatChecked', 'Co přesně tento audit zkontroluje?')}
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-slate-700">
                   <div className="p-3 rounded-lg bg-white border border-slate-200 space-y-1">
                     <p className="font-bold text-teal-800 flex items-center gap-1.5">
                       <CheckCircle2 className="w-3.5 h-3.5 text-teal-600" />
-                      Návaznost a logika slov
+                      {t('auditCoherenceTitle', 'Návaznost a logika slov')}
                     </p>
                     <p className="text-[11px] text-slate-500">
-                      Ověří, zda na sebe výrazy přirozeně navazují a dávají přesný smysl v kontextu tématu prezentace.
+                      {t('auditCoherenceDesc', 'Ověří, zda na sebe výrazy přirozeně navazují a dávají přesný smysl v kontextu tématu prezentace.')}
                     </p>
                   </div>
 
                   <div className="p-3 rounded-lg bg-white border border-slate-200 space-y-1">
                     <p className="font-bold text-teal-800 flex items-center gap-1.5">
                       <CheckCircle2 className="w-3.5 h-3.5 text-teal-600" />
-                      Jednotná terminologie
+                      {t('auditTerminologyTitle', 'Jednotná terminologie')}
                     </p>
                     <p className="text-[11px] text-slate-500">
-                      Zkontroluje, zda stejné pojmy nebo odborné fráze nejsou na různých slidech přeloženy odlišně.
+                      {t('auditTerminologyDesc', 'Zkontroluje, zda stejné pojmy nebo odborné fráze nejsou na různých slidech přeloženy odlišně.')}
                     </p>
                   </div>
 
                   <div className="p-3 rounded-lg bg-white border border-slate-200 space-y-1">
                     <p className="font-bold text-teal-800 flex items-center gap-1.5">
                       <CheckCircle2 className="w-3.5 h-3.5 text-teal-600" />
-                      Neporušený význam originálu
+                      {t('auditIntegrityTitle', 'Neporušený význam originálu')}
                     </p>
                     <p className="text-[11px] text-slate-500">
-                      Detekuje případný významový posun nebo zavádějící vyznění po překladu či manuální úpravě.
+                      {t('auditIntegrityDesc', 'Detekuje případný významový posun nebo zavádějící vyznění po překladu či manuální úpravě.')}
                     </p>
                   </div>
 
                   <div className="p-3 rounded-lg bg-white border border-slate-200 space-y-1">
                     <p className="font-bold text-teal-800 flex items-center gap-1.5">
                       <CheckCircle2 className="w-3.5 h-3.5 text-teal-600" />
-                      Doporučení 1-klikem
+                      {t('auditOneClickTitle', 'Doporučení 1-klikem')}
                     </p>
                     <p className="text-[11px] text-slate-500">
-                      Při nalezení nesrovnalosti AI vygeneruje opravenou variantu, kterou můžete okamžitě aplikovat.
+                      {t('auditOneClickDesc', 'Při nalezení nesrovnalosti AI vygeneruje opravenou variantu, kterou můžete okamžitě aplikovat.')}
                     </p>
                   </div>
                 </div>

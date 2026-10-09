@@ -53,7 +53,7 @@ export const AiTranslationModal: React.FC<AiTranslationModalProps> = ({
   onApplyTranslations,
 }) => {
   const { t } = useLanguage();
-  const [targetLanguage, setTargetLanguage] = useState<string>('Angličtina (English)');
+  const [targetLanguage, setTargetLanguage] = useState<string>('en');
   const [scope, setScope] = useState<'all' | 'current' | 'single'>(
     initialParagraph ? 'single' : 'all'
   );
@@ -192,7 +192,7 @@ export const AiTranslationModal: React.FC<AiTranslationModalProps> = ({
       if (response.warning) setWarning(response.warning);
     } catch (err: any) {
       if (controller.signal.aborted) return;
-      setError(err.message || 'Nepodařilo se provést překlad.');
+      setError(err.message || t('translationFailed', 'Nepodařilo se provést překlad.'));
     } finally {
       if (abortRef.current === controller) abortRef.current = null;
       setIsLoading(false);
@@ -292,7 +292,7 @@ export const AiTranslationModal: React.FC<AiTranslationModalProps> = ({
                       <span>{t('providerGemma', 'Gemma 4 (Místní AI)')}</span>
                     </div>
                     <p className="text-[10px] text-purple-700 font-semibold mt-0.5">
-                      {isGemmaOnline ? 'Ollama • Aktivní' : t('providerGemmaDesc', 'Ollama • Offline AI bez limitů')}
+                      {isGemmaOnline ? t('ollamaActive', 'Ollama • Aktivní') : t('providerGemmaDesc', 'Ollama • Offline AI bez limitů')}
                     </p>
                   </button>
 
@@ -381,9 +381,9 @@ export const AiTranslationModal: React.FC<AiTranslationModalProps> = ({
                     <button
                       key={lang.code}
                       type="button"
-                      onClick={() => setTargetLanguage(lang.name)}
+                      onClick={() => setTargetLanguage(lang.code)}
                       className={`px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 border transition-all text-left ${
-                        targetLanguage === lang.name
+                        targetLanguage === lang.code
                           ? 'bg-blue-50 border-blue-500 text-blue-950 ring-2 ring-blue-500/20 shadow-xs'
                           : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300'
                       }`}
@@ -507,16 +507,16 @@ export const AiTranslationModal: React.FC<AiTranslationModalProps> = ({
               className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-2 shadow-md shadow-emerald-600/20 transition-all disabled:opacity-50"
             >
               {isLoading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>{t('translatingProgress', 'Překládám texty...')} ({totalItemsCount})</span>
-                </>
+                <Loader2 className="w-4 h-4 animate-spin shrink-0" />
               ) : (
-                <>
-                  <Languages className="w-4 h-4" />
-                  <span>{t('startTranslationBtn', 'Spustit překlad')} ({totalItemsCount})</span>
-                </>
+                <Languages className="w-4 h-4 shrink-0" />
               )}
+              <span>
+                {isLoading
+                  ? t('translatingProgress', 'Překládám texty...')
+                  : t('startTranslationBtn', 'Spustit překlad')}
+                {` (${totalItemsCount})`}
+              </span>
             </button>
           ) : (
             <button

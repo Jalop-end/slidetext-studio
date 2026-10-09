@@ -81,18 +81,18 @@ export async function fetchServerStatus(): Promise<ServerStatusResponse | null> 
 }
 
 function normalizeLangCode(lang: string): string {
-  const l = (lang || '').toLowerCase();
-  if (l.includes('ang') || l.startsWith('en')) return 'en';
-  if (l.includes('něm') || l.includes('nem') || l.startsWith('de')) return 'de';
-  if (l.includes('češ') || l.includes('ces') || l.startsWith('cs')) return 'cs';
-  if (l.includes('slov') || l.startsWith('sk')) return 'sk';
-  if (l.includes('pol') || l.startsWith('pl')) return 'pl';
-  if (l.includes('špan') || l.includes('span') || l.startsWith('es')) return 'es';
-  if (l.includes('fran') || l.startsWith('fr')) return 'fr';
-  if (l.includes('ital') || l.startsWith('it')) return 'it';
-  if (l.includes('ukr') || l.startsWith('uk')) return 'uk';
-  if (l.includes('čín') || l.includes('cin') || l.startsWith('zh')) return 'zh';
-  if (l.includes('jap') || l.startsWith('ja')) return 'ja';
+  const l = (lang || '').toLowerCase().trim();
+  if (l === 'en' || l.startsWith('en') || l.includes('ang')) return 'en';
+  if (l === 'de' || l.startsWith('de') || l.includes('něm') || l.includes('nem') || l.includes('ger')) return 'de';
+  if (l === 'cs' || l.startsWith('cs') || l.includes('češ') || l.includes('ces') || l.includes('czech')) return 'cs';
+  if (l === 'sk' || l.startsWith('sk') || l.includes('slov')) return 'sk';
+  if (l === 'pl' || l.startsWith('pl') || l.includes('pol')) return 'pl';
+  if (l === 'es' || l.startsWith('es') || l.includes('špan') || l.includes('span')) return 'es';
+  if (l === 'fr' || l.startsWith('fr') || l.includes('fran')) return 'fr';
+  if (l === 'it' || l.startsWith('it') || l.includes('ital')) return 'it';
+  if (l === 'uk' || l.startsWith('uk') || l.includes('ukr')) return 'uk';
+  if (l === 'zh' || l.startsWith('zh') || l.includes('čín') || l.includes('cin') || l.includes('chin')) return 'zh';
+  if (l === 'ja' || l.startsWith('ja') || l.includes('jap')) return 'ja';
   return 'en';
 }
 

@@ -69,7 +69,7 @@ export const AiPolishModal: React.FC<AiPolishModalProps> = ({
 
     const items = getItemsToPolish();
     if (items.length === 0) {
-      setError('Nebyly nalezeny žádné texty ke korektuře.');
+      setError(t('noTextsToPolish', 'Nebyly nalezeny žádné texty ke korektuře.'));
       setIsLoading(false);
       return;
     }
@@ -78,7 +78,7 @@ export const AiPolishModal: React.FC<AiPolishModalProps> = ({
       const results = await requestAiPolish(items, mode, 'čeština');
       setPreviewResults(results);
     } catch (err: any) {
-      setError(err.message || 'Nepodařilo se provést korekturu.');
+      setError(err.message || t('polishFailed', 'Nepodařilo se provést korekturu.'));
     } finally {
       setIsLoading(false);
     }
@@ -140,22 +140,22 @@ export const AiPolishModal: React.FC<AiPolishModalProps> = ({
                     {
                       id: 'grammar',
                       title: t('polishModeGrammar', 'Gramatika a pravopis'),
-                      desc: 'Opraví pravopis, interpunkci a chyby',
+                      desc: t('polishDescGrammar', 'Opraví pravopis, interpunkci a chyby'),
                     },
                     {
                       id: 'concise',
                       title: t('polishModeConcise', 'Stručně a úderně'),
-                      desc: 'Zkrátí text do úderných odrážek',
+                      desc: t('polishDescConcise', 'Zkrátí text do úderných odrážek'),
                     },
                     {
                       id: 'professional',
                       title: t('polishModeProfessional', 'Manažerský styl'),
-                      desc: 'Uhladí formulace do formálního stylu',
+                      desc: t('polishDescProfessional', 'Uhladí formulace do formálního stylu'),
                     },
                     {
                       id: 'engaging',
                       title: t('polishModeEngaging', 'Poutavý a moderní'),
-                      desc: 'Oživí text dynamickými výrazy',
+                      desc: t('polishDescEngaging', 'Oživí text dynamickými výrazy'),
                     },
                   ].map((m) => (
                     <button
