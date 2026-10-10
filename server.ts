@@ -105,6 +105,16 @@ function extractJsonFromText(rawText: string): any {
     if (candidateParsed !== null) return candidateParsed;
   }
 
+  // 5. Fallback for truncated JSON containing domain/style
+  const domainMatch = text.match(/"domain"\s*:\s*"([^"]+)"/i);
+  const styleMatch = text.match(/"style"\s*:\s*"([^"]+)"/i);
+  if (domainMatch || styleMatch) {
+    return {
+      domain: domainMatch ? domainMatch[1] : 'Odborný kontext',
+      style: styleMatch ? styleMatch[1] : 'Technický formální',
+    };
+  }
+
   throw new Error(`Nelze dekódovat JSON z výstupu modelu: ${text.slice(0, 100)}`);
 }
 
@@ -125,7 +135,7 @@ async function callGemmaJson(prompt: string, timeoutMs = 60000): Promise<any> {
         stream: false,
         options: {
           temperature: 0.1,
-          num_predict: 2048,
+          num_predict: 3072,
         },
       }),
       signal: controller.signal,
