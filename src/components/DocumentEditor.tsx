@@ -14,9 +14,11 @@ import {
   Link as LinkIcon,
   Eye,
   CheckCircle2,
+  Loader2,
 } from 'lucide-react';
 import { PptxDocument, PptxParagraph, PptxSlide } from '../types/pptx';
 import { useLanguage } from '../context/LanguageContext';
+import { fetchTranslationAlternatives } from '../services/aiService';
 
 interface DocumentEditorProps {
   document: PptxDocument;
@@ -53,6 +55,23 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
   const [collapsedSlides, setCollapsedSlides] = useState<Record<number, boolean>>({});
   const [showDiffMap, setShowDiffMap] = useState<Record<string, boolean>>({});
   const itemRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [loadingAltsForId, setLoadingAltsForId] = useState<string | null>(null);
+  const [dynamicAlternatives, setDynamicAlternatives] = useState<Record<string, string[]>>({});
+
+  const handleFetchMoreAlternatives = async (p: PptxParagraph) => {
+    setLoadingAltsForId(p.id);
+    try {
+      const alts = await fetchTranslationAlternatives(p.originalText, p.currentText, 'en');
+      if (alts && alts.length > 0) {
+        setDynamicAlternatives((prev) => ({
+          ...prev,
+          [p.id]: Array.from(new Set([...(prev[p.id] || p.alternatives || []), ...alts])),
+        }));
+      }
+    } finally {
+      setLoadingAltsForId(null);
+    }
+  };
 
   // Auto-scroll when a paragraph is selected from the Slide Visualizer
   useEffect(() => {
@@ -573,6 +592,24 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                                     type="button"
                                     onClick={(e) => {
                                       e.stopPropagation();
+                                      handleFetchMoreAlternatives(paragraph);
+                                    }}
+                                    disabled={loadingAltsForId === paragraph.id}
+                                    className="p-1 rounded text-purple-700 hover:bg-purple-100/70 hover:text-purple-900 transition-colors text-[11px] font-medium flex items-center gap-1 px-1.5 disabled:opacity-50"
+                                    title="Získat alternativní styly a varianty překladu přes Gemma 4"
+                                  >
+                                    {loadingAltsForId === paragraph.id ? (
+                                      <Loader2 className="w-3 h-3 animate-spin" />
+                                    ) : (
+                                      <Sparkles className="w-3 h-3" />
+                                    )}
+                                    <span className="hidden sm:inline">Varianty</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
                                       onSinglePolish(paragraph);
                                     }}
                                     className="p-1 rounded text-amber-700 hover:bg-amber-100 hover:text-amber-900 transition-colors text-[11px] font-medium flex items-center gap-1 px-1.5"
@@ -643,6 +680,57 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                                   placeholder={t('inputPlaceholder', 'Zadejte text odstavce...')}
                                 />
                               </div>
+
+                              {/* Domain Alternative Translations Chips (e.g. Support services vs Ancillary) */}
+                              {(() => {
+                                const currentAlts =
+                                  dynamicAlternatives[paragraph.id] || paragraph.alternatives;
+                                if (!currentAlts || currentAlts.length === 0) return null;
+                                return (
+                                  <div className="mt-2 p-2.5 rounded-xl bg-indigo-50/80 border border-indigo-200/90 text-xs space-y-1.5 animate-in fade-in duration-150">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-900 flex items-center gap-1.5">
+                                        <Sparkles className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                                        <span>Varianty překladu (klikněte pro okamžitou záměnu):</span>
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleFetchMoreAlternatives(paragraph);
+                                        }}
+                                        disabled={loadingAltsForId === paragraph.id}
+                                        className="text-[10px] font-semibold text-indigo-700 hover:text-indigo-900 hover:underline flex items-center gap-1 disabled:opacity-50"
+                                      >
+                                        {loadingAltsForId === paragraph.id ? (
+                                          <Loader2 className="w-3 h-3 animate-spin" />
+                                        ) : (
+                                          <Sparkles className="w-3 h-3" />
+                                        )}
+                                        <span>
+                                          {loadingAltsForId === paragraph.id ? 'Hledám...' : '+ Další'}
+                                        </span>
+                                      </button>
+                                    </div>
+                                    <div className="flex flex-wrap gap-1.5 pt-0.5">
+                                      {currentAlts.map((alt, aIdx) => (
+                                        <button
+                                          key={`doc-alt-${paragraph.id}-${aIdx}`}
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            onUpdateParagraphText(paragraph.id, alt);
+                                          }}
+                                          className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-white hover:bg-indigo-600 hover:text-white text-indigo-950 border border-indigo-300 shadow-xs transition-all active:scale-95 flex items-center gap-1"
+                                          title={`Nahradit text touto variantou: "${alt}"`}
+                                        >
+                                          <span>{alt}</span>
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                );
+                              })()}
 
                               {/* AI Notes / Length Fit Warnings Banner */}
                               {paragraph.isModified &&

@@ -37,6 +37,7 @@ export interface PptxParagraph {
   verificationStatus?: 'ok' | 'warning' | 'suggestion';
   verificationIssue?: string;
   verificationSuggestion?: string;
+  alternatives?: string[];
 }
 
 export interface PptxShape {

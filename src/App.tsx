@@ -362,6 +362,7 @@ export default function App() {
               isModified: true, // Always mark true so every translated element is tracked and marked edited
               aiNotes: res.notes || (textChanged ? 'Přeloženo' : 'Přeloženo (beze změny)'),
               lengthFitWarning: res.lengthFitWarning,
+              alternatives: res.alternatives && res.alternatives.length > 0 ? res.alternatives : p.alternatives,
             };
           }
           if (p.isModified) modCount++;

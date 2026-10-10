@@ -8,6 +8,7 @@ export interface TranslationResultItem {
   role?: string;
   notes?: string;
   lengthFitWarning?: string;
+  alternatives?: string[];
 }
 
 export interface PolishResultItem {
@@ -32,6 +33,8 @@ export interface TranslationResponse {
   results: TranslationResultItem[];
   failedCount: number;
   warning?: string;
+  domain?: string;
+  style?: string;
 }
 
 export interface ServerStatusResponse {
@@ -353,6 +356,7 @@ export async function requestAiTranslation(
             originalText: originalItem?.originalText || '',
             slideNumber: originalItem?.slideNumber,
             role: originalItem?.role,
+            alternatives: t.alternatives || [],
             notes:
               data.engine === 'gemma4'
                 ? 'Lokální AI Gemma 4 (100% zachování layoutu)'
@@ -363,7 +367,13 @@ export async function requestAiTranslation(
                 : 'Bleskový bezplatný překlad (100% zachování layoutu)',
           };
         });
-        return { results, failedCount: 0 };
+        return {
+          results,
+          failedCount: 0,
+          domain: data.domain,
+          style: data.style,
+          warning: data.warning,
+        };
       }
     }
   } catch (serverErr) {
@@ -471,4 +481,37 @@ export async function requestAiPolish(
 
   const data = await res.json();
   return data.polishedItems || [];
+}
+
+/**
+ * Fetches domain-appropriate alternative translations (e.g. Support services vs Ancillary)
+ */
+export async function fetchTranslationAlternatives(
+  text: string,
+  currentTranslation: string,
+  targetLanguage: string = 'en'
+): Promise<string[]> {
+  try {
+    const res = await fetch('/api/translate/alternatives', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text,
+        currentTranslation,
+        targetLanguage,
+      }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.alternatives)) {
+        return data.alternatives;
+      }
+      if (Array.isArray(data.variants)) {
+        return data.variants;
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to fetch translation alternatives:', err);
+  }
+  return [];
 }

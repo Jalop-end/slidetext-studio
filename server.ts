@@ -125,6 +125,7 @@ async function callGemmaJson(prompt: string, timeoutMs = 60000): Promise<any> {
         stream: false,
         options: {
           temperature: 0.1,
+          num_predict: 2048,
         },
       }),
       signal: controller.signal,
@@ -136,7 +137,8 @@ async function callGemmaJson(prompt: string, timeoutMs = 60000): Promise<any> {
     }
 
     const data: any = await res.json();
-    return extractJsonFromText(data?.response || '');
+    const respStr = data?.response || data?.thinking || '';
+    return extractJsonFromText(respStr);
   } catch (err: any) {
     if (err.name === 'AbortError') {
       throw new Error(`Gemma (${modelToUse}) neodpověděla v časovém limitu ${Math.round(timeoutMs / 1000)} s.`);
@@ -460,6 +462,56 @@ ${JSON.stringify(gemmaItems)}`;
 }
 
 // ---------------------------------------------------------------------------
+// AI Domain, Style & Terminology Intelligence (powered by Gemma 4)
+// "nauc gemmu rozlisovat o jaky typ textu se jedna a ta pote vyhodnoti jaky styl prekladu tam ma byt"
+// ---------------------------------------------------------------------------
+async function analyzePresentationDomainAndStyle(
+  sampleTexts: string[],
+  targetLang: string
+): Promise<{
+  domain: string;
+  style: string;
+  glossary: Record<string, string>;
+  termAlternatives: Record<string, string[]>;
+} | null> {
+  const samples = sampleTexts.filter((t) => t && t.trim().length > 2 && t.trim().length < 90).slice(0, 10);
+  if (samples.length === 0) return null;
+
+  try {
+    const prompt = `Jsi profesionální terminolog a překladatel PowerPoint prezentací do cílového jazyka: "${targetLang}".
+Zanalyzuj tyto ukázky z prezentace:
+${JSON.stringify(samples)}
+
+Úkol:
+1. Urči přesný obor/doménu textu (domain, např. "Energetika a přenosová soustava", "Marketing a obchod", "Právo", "IT / Software", "Věda a výzkum").
+2. Urči vhodný styl překladu pro prezentaci (style, např. "Odborný technický", "Korporátní", "Marketingový").
+3. Vytvoř odborný glosář klíčových termínů (glossary: české slovo -> doporučený překlad do cílového jazyka).
+4. Navrhni alternativní verze překladu pro klíčové termíny (termAlternatives: doporučený překlad -> pole 2-3 alternativních verzí, např. "Ancillary Services": ["Support Services", "Auxiliary Services"], "Island Operation": ["Island Mode", "Microgrid Operation"]).
+
+Vrať POUZE validní JSON ve formátu:
+{
+  "domain": "string",
+  "style": "string",
+  "glossary": { "český termín": "doporučený překlad" },
+  "termAlternatives": { "doporučený překlad": ["alternativa 1", "alternativa 2"] }
+}`;
+
+    const parsed = await callGemmaJson(prompt, 18000);
+    if (parsed && typeof parsed === 'object') {
+      return {
+        domain: parsed.domain || 'Odborný kontext',
+        style: parsed.style || 'Technický formální',
+        glossary: parsed.glossary || {},
+        termAlternatives: parsed.termAlternatives || {},
+      };
+    }
+  } catch (err: any) {
+    console.warn('[Domain & Style analysis notice]', err.message);
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // 0. Status Endpoint: Check Gemma 4 & Translator availability
 // ---------------------------------------------------------------------------
 app.get('/api/status', async (_req, res) => {
@@ -498,7 +550,7 @@ app.get('/api/status', async (_req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// 1. Direct Translator API Endpoint (Free MyMemory / Gemma 4 / Paid Key)
+// 1. Direct Translator API Endpoint (Free Web + Gemma AI Context & Style)
 // ---------------------------------------------------------------------------
 app.post('/api/translate', async (req, res) => {
   try {
@@ -510,7 +562,7 @@ app.post('/api/translate', async (req, res) => {
 
     const resultMap = new Map<string, string>();
 
-    // 1. User explicitly selected Gemma 4 (local AI, offline, 100% free)
+    // 1. User explicitly selected Gemma 4 only
     if (provider === 'gemma') {
       const gemmaItems = items.map((it: any) => ({
         id: it.id,
@@ -559,25 +611,127 @@ app.post('/api/translate', async (req, res) => {
       return res.json({ translations: finalTranslations, engine: effectiveProvider });
     }
 
-    // 3. Fast Free Web Translator (Google Translate GTX)
+    // 3. Fast Hybrid Intelligence Translator (Gemma 4 Domain/Style Guidance + Google Translate GTX)
     const rawTexts = items.map((it: any) => it.originalText || it.text || '');
-    const translatedTexts = await translateWithGoogleFreeWeb(rawTexts, targetLanguage);
 
-    items.forEach((item: any, idx: number) => {
-      resultMap.set(item.id, translatedTexts[idx] || item.originalText || item.text || '');
+    // Sample representative texts for Gemma domain analysis
+    const sampleTexts = items
+      .map((it: any) => (it.originalText || it.text || '').trim())
+      .filter((t: string) => t.length > 3 && t.length < 80);
+
+    // Launch Gemma domain & glossary analysis in parallel with fast translation
+    const analysisPromise = analyzePresentationDomainAndStyle(sampleTexts, targetLanguage);
+    const translationPromise = translateWithGoogleFreeWeb(rawTexts, targetLanguage);
+
+    const [translatedTexts, domainAnalysis] = await Promise.all([
+      translationPromise,
+      Promise.race([
+        analysisPromise,
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 10000)),
+      ]).catch(() => null),
+    ]);
+
+    const glossary = domainAnalysis?.glossary || {};
+    const termAlternatives = domainAnalysis?.termAlternatives || {};
+
+    const finalTranslations = items.map((item: any, idx: number) => {
+      let tr = translatedTexts[idx] || item.originalText || item.text || '';
+      const orig = item.originalText || item.text || '';
+      const alternatives: string[] = [];
+
+      // Check glossary matching
+      for (const [czTerm, enTerm] of Object.entries(glossary)) {
+        if (!czTerm || !enTerm || typeof enTerm !== 'string') continue;
+        const reg = new RegExp(czTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+        if (reg.test(orig)) {
+          // If translation doesn't already contain the technical term, keep original translation as alternative
+          if (!tr.toLowerCase().includes(enTerm.toLowerCase())) {
+            alternatives.push(tr);
+            tr = tr.replace(new RegExp(czTerm, 'gi'), enTerm);
+          }
+          const alts = termAlternatives[enTerm] || termAlternatives[czTerm];
+          if (Array.isArray(alts)) {
+            alts.forEach((alt: string) => {
+              if (
+                typeof alt === 'string' &&
+                alt.trim() &&
+                !alternatives.includes(alt.trim()) &&
+                alt.trim().toLowerCase() !== tr.toLowerCase()
+              ) {
+                alternatives.push(alt.trim());
+              }
+            });
+          }
+        }
+      }
+
+      return {
+        id: item.id,
+        translatedText: tr,
+        alternatives: alternatives.length > 0 ? alternatives : undefined,
+      };
     });
 
-    const finalTranslations = items.map((item: any) => ({
-      id: item.id,
-      translatedText: resultMap.get(item.id) || item.originalText || item.text || '',
-    }));
-
-    return res.json({ translations: finalTranslations, engine: 'free-web' });
+    return res.json({
+      translations: finalTranslations,
+      engine: domainAnalysis ? 'hybrid' : 'free-web',
+      domain: domainAnalysis?.domain,
+      style: domainAnalysis?.style,
+    });
   } catch (error: any) {
     console.error('Chyba při překladu:', error);
     return res.status(500).json({
       error: error.message || 'Chyba při komunikaci s překladačem.',
     });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 1b. Single Item Alternatives Endpoint (Interactive multiple version picker)
+// "at je moznost vice prekladovych verzi napriklad Support services: jde napsat taky jako ancillary atd"
+// ---------------------------------------------------------------------------
+app.post('/api/translate/alternatives', async (req, res) => {
+  try {
+    const { text, targetLanguage = 'angličtina', currentTranslation } = req.body;
+    if (!text || !text.trim()) {
+      return res.status(400).json({ error: 'Text nesmí být prázdný.' });
+    }
+
+    const variants: string[] = [];
+    if (currentTranslation && currentTranslation.trim()) {
+      variants.push(currentTranslation.trim());
+    }
+
+    const prompt = `Navrhni 3 různé profesionální překladové verze tohoto textu z PowerPoint prezentace do jazyka "${targetLanguage}":
+"${text.trim()}"
+
+Příklad (pro různé styly - technický/odborný, doslovný, zjednodušený):
+Text: "Podpůrné služby"
+Verze: ["Ancillary Services", "Support Services", "Auxiliary Services"]
+
+Vrať POUZE JSON:
+{"variants": ["verze 1", "verze 2", "verze 3"]}`;
+
+    try {
+      const parsed = await callGemmaJson(prompt, 14000);
+      const list = parsed?.variants || parsed?.translations || [];
+      if (Array.isArray(list)) {
+        list.forEach((v: string) => {
+          if (typeof v === 'string' && v.trim() && !variants.includes(v.trim())) {
+            variants.push(v.trim());
+          }
+        });
+      }
+    } catch {}
+
+    if (variants.length === 0) {
+      const fb = await translateWithGoogleFreeWeb([text], targetLanguage);
+      if (fb[0] && !variants.includes(fb[0])) variants.push(fb[0]);
+    }
+
+    return res.json({ text, alternatives: variants, variants });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
   }
 });
 

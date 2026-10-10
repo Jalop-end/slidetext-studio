@@ -78,6 +78,8 @@ export const AiTranslationModal: React.FC<AiTranslationModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [previewResults, setPreviewResults] = useState<TranslationResultItem[] | null>(null);
+  const [detectedDomain, setDetectedDomain] = useState<string | null>(null);
+  const [detectedStyle, setDetectedStyle] = useState<string | null>(null);
   const [selectedPreviewSlide, setSelectedPreviewSlide] = useState<number | 'all'>('all');
   const abortRef = useRef<AbortController | null>(null);
 
@@ -195,6 +197,8 @@ export const AiTranslationModal: React.FC<AiTranslationModalProps> = ({
 
       if (controller.signal.aborted) return;
       setPreviewResults(response.results);
+      if (response.domain) setDetectedDomain(response.domain);
+      if (response.style) setDetectedStyle(response.style);
       if (response.warning) setWarning(response.warning);
     } catch (err: any) {
       if (controller.signal.aborted) return;
@@ -203,6 +207,26 @@ export const AiTranslationModal: React.FC<AiTranslationModalProps> = ({
       if (abortRef.current === controller) abortRef.current = null;
       setIsLoading(false);
     }
+  };
+
+  const handleSelectAlternativeInPreview = (itemId: string, selectedAlt: string) => {
+    setPreviewResults((prev) => {
+      if (!prev) return null;
+      return prev.map((item) => {
+        if (item.id === itemId) {
+          const currentText = item.translatedText;
+          const nextAlternatives = Array.from(
+            new Set([currentText, ...(item.alternatives || [])])
+          ).filter((a) => a !== selectedAlt);
+          return {
+            ...item,
+            translatedText: selectedAlt,
+            alternatives: nextAlternatives,
+          };
+        }
+        return item;
+      });
+    });
   };
 
   const handleApply = () => {
@@ -479,6 +503,27 @@ export const AiTranslationModal: React.FC<AiTranslationModalProps> = ({
 
               return (
                 <div className="space-y-3.5">
+                  {/* Domain & Style Intelligence Banner */}
+                  {detectedDomain && (
+                    <div className="p-3 rounded-xl bg-purple-50 border border-purple-200/80 text-xs text-purple-900 flex items-center justify-between gap-2 shadow-xs">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Sparkles className="w-4 h-4 text-purple-600 shrink-0" />
+                        <div className="min-w-0 truncate">
+                          <span className="font-bold text-purple-950">Gemma 4 rozpoznala obor: </span>
+                          <span className="font-semibold text-purple-800">{detectedDomain}</span>
+                          {detectedStyle && (
+                            <span className="text-purple-600 text-[11px] ml-1.5">
+                              (Styl: {detectedStyle})
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full border border-purple-200 shrink-0">
+                        ⚡ Terminologie sladěna
+                      </span>
+                    </div>
+                  )}
+
                   <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-200">
                     <p className="text-xs font-bold text-slate-900">
                       {t('previewTitle', 'Náhled přeložených textů')}: {filteredPreviewResults.length}{' '}
@@ -610,6 +655,29 @@ export const AiTranslationModal: React.FC<AiTranslationModalProps> = ({
                           </span>
                           <p className="text-slate-900 font-semibold whitespace-pre-wrap">{item.translatedText}</p>
                         </div>
+
+                        {/* Domain-specific alternatives (e.g. Support services vs Ancillary) */}
+                        {item.alternatives && item.alternatives.length > 0 && (
+                          <div className="pt-1.5 space-y-1">
+                            <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                              <Sparkles className="w-3 h-3 text-indigo-500" />
+                              <span>Alternativní překlady (klikněte pro výběr):</span>
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {item.alternatives.map((alt, aIdx) => (
+                                <button
+                                  key={`prev-alt-${item.id}-${aIdx}`}
+                                  type="button"
+                                  onClick={() => handleSelectAlternativeInPreview(item.id, alt)}
+                                  className="px-2 py-0.5 rounded text-[11px] font-semibold bg-white hover:bg-indigo-600 hover:text-white text-indigo-900 border border-indigo-200 shadow-xs transition-colors"
+                                  title={`Klikněte pro záměnu na: "${alt}"`}
+                                >
+                                  {alt}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
