@@ -166,6 +166,8 @@ export const AiTranslationModal: React.FC<AiTranslationModalProps> = ({
     setError(null);
     setWarning(null);
     setPreviewResults(null);
+    setDetectedDomain(null);
+    setDetectedStyle(null);
 
     const items = getItemsToTranslate();
     if (items.length === 0) {
@@ -319,10 +321,10 @@ export const AiTranslationModal: React.FC<AiTranslationModalProps> = ({
                   >
                     <div className="flex items-center gap-1.5 font-bold text-xs text-slate-900">
                       <Cpu className="w-3.5 h-3.5 text-purple-600" />
-                      <span>{t('providerGemma', 'Gemma 4 (Místní AI)')}</span>
+                      <span>{t('providerGemma', 'Gemma 4 Inteligence (AI)')}</span>
                     </div>
                     <p className="text-[10px] text-purple-700 font-semibold mt-0.5">
-                      {isGemmaOnline ? t('ollamaActive', 'Ollama • Aktivní') : t('providerGemmaDesc', 'Ollama • Offline AI bez limitů')}
+                      {isGemmaOnline ? 'Ollama • Analýza stylu & varianty' : 'Ollama • Offline AI bez limitů'}
                     </p>
                   </button>
 
@@ -358,7 +360,7 @@ export const AiTranslationModal: React.FC<AiTranslationModalProps> = ({
                 <div className="p-3 rounded-xl bg-purple-50 border border-purple-200 text-xs text-purple-800 flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-purple-600 shrink-0" />
                   <span>
-                    {t('gemmaBanner', 'Lokální AI: Překlad provádí váš model Gemma 4 na vašem počítači přes Ollama (zcela zdarma a offline).')}
+                    {t('gemmaBanner', 'Inteligentní AI překlad: Gemma 4 zanalyzuje obor a styl prezentace a vygeneruje alternativní verze termínů (např. Support services vs Ancillary). Rychlý engine pak přeloží všechny texty bleskově.')}
                   </span>
                 </div>
               )}
@@ -711,7 +713,9 @@ export const AiTranslationModal: React.FC<AiTranslationModalProps> = ({
               )}
               <span>
                 {isLoading
-                  ? t('translatingProgress', 'Překládám texty...')
+                  ? provider === 'gemma'
+                    ? 'Gemma 4 analyzuje obor a překládá...'
+                    : t('translatingProgress', 'Překládám texty...')
                   : t('startTranslationBtn', 'Spustit překlad')}
                 {` (${totalItemsCount})`}
               </span>

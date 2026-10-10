@@ -358,8 +358,8 @@ export async function requestAiTranslation(
             role: originalItem?.role,
             alternatives: t.alternatives || [],
             notes:
-              data.engine === 'gemma4'
-                ? 'Lokální AI Gemma 4 (100% zachování layoutu)'
+              data.engine === 'gemma4' || data.engine === 'gemma4-guided'
+                ? 'Gemma 4 styl & glosář (100% layout)'
                 : data.engine === 'deepl'
                 ? 'DeepL API (100% zachování layoutu)'
                 : data.engine === 'google'
