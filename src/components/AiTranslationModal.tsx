@@ -11,6 +11,9 @@ import {
   Save,
   CheckCircle2,
   Sparkles,
+  ChevronLeft,
+  ChevronRight,
+  Layers,
 } from 'lucide-react';
 import { PptxDocument, PptxParagraph, TranslationItem } from '../types/pptx';
 import {
@@ -27,6 +30,7 @@ interface AiTranslationModalProps {
   document: PptxDocument;
   currentSlideNumber: number;
   initialParagraph?: PptxParagraph | null;
+  initialScope?: 'all' | 'current' | 'single';
   onApplyTranslations: (results: TranslationResultItem[]) => void;
 }
 
@@ -50,12 +54,13 @@ export const AiTranslationModal: React.FC<AiTranslationModalProps> = ({
   document,
   currentSlideNumber,
   initialParagraph,
+  initialScope,
   onApplyTranslations,
 }) => {
   const { t } = useLanguage();
   const [targetLanguage, setTargetLanguage] = useState<string>('en');
   const [scope, setScope] = useState<'all' | 'current' | 'single'>(
-    initialParagraph ? 'single' : 'all'
+    initialScope || (initialParagraph ? 'single' : 'all')
   );
   // Default is 100% free fast translator
   const [provider, setProvider] = useState<'free' | 'gemma' | 'custom-key'>('free');
@@ -73,6 +78,7 @@ export const AiTranslationModal: React.FC<AiTranslationModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [previewResults, setPreviewResults] = useState<TranslationResultItem[] | null>(null);
+  const [selectedPreviewSlide, setSelectedPreviewSlide] = useState<number | 'all'>('all');
   const abortRef = useRef<AbortController | null>(null);
 
   // Fetch server status on mount
@@ -452,40 +458,164 @@ export const AiTranslationModal: React.FC<AiTranslationModalProps> = ({
             </div>
           ) : (
             /* Results Preview */
-            <div className="space-y-4">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-200">
-                <p className="text-xs font-bold text-slate-900">
-                  {t('previewTitle', 'Náhled přeložených textů')}: {previewResults.length} {t('itemsCountLabel', 'položek')}
-                </p>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setPreviewResults(null)}
-                    className="text-[11px] text-blue-600 hover:text-blue-800 font-semibold underline"
-                  >
-                    {t('backToSettings', 'Zpět k nastavení')}
-                  </button>
-                  <span className="text-xs font-semibold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-200">
-                    {targetLanguage}
-                  </span>
-                </div>
-              </div>
+            (() => {
+              const availablePreviewSlides = Array.from(
+                new Set(
+                  previewResults
+                    .map((item) => item.slideNumber)
+                    .filter((s): s is number => typeof s === 'number')
+                )
+              ).sort((a, b) => a - b);
 
-              <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
-                {previewResults.map((item, idx) => (
-                  <div
-                    key={item.id}
-                    className="p-3 rounded-xl border border-slate-200 bg-slate-50/80 text-xs space-y-1.5"
-                  >
-                    <div className="flex items-center justify-between text-slate-400 font-semibold text-[10px]">
-                      <span>#{idx + 1}</span>
-                      {item.notes && <span className="text-emerald-700 font-medium">{item.notes}</span>}
+              const filteredPreviewResults =
+                selectedPreviewSlide === 'all'
+                  ? previewResults
+                  : previewResults.filter((item) => item.slideNumber === selectedPreviewSlide);
+
+              const currentSlideIndex =
+                typeof selectedPreviewSlide === 'number'
+                  ? availablePreviewSlides.indexOf(selectedPreviewSlide)
+                  : -1;
+
+              return (
+                <div className="space-y-3.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-200">
+                    <p className="text-xs font-bold text-slate-900">
+                      {t('previewTitle', 'Náhled přeložených textů')}: {filteredPreviewResults.length}{' '}
+                      {selectedPreviewSlide === 'all' ? `z celkem ${previewResults.length}` : ''}{' '}
+                      {t('itemsCountLabel', 'položek')}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPreviewResults(null);
+                          setSelectedPreviewSlide('all');
+                        }}
+                        className="text-[11px] text-blue-600 hover:text-blue-800 font-semibold underline"
+                      >
+                        {t('backToSettings', 'Zpět k nastavení')}
+                      </button>
+                      <span className="text-xs font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200 uppercase">
+                        {targetLanguage}
+                      </span>
                     </div>
-                    <p className="text-slate-900 font-medium whitespace-pre-wrap">{item.translatedText}</p>
                   </div>
-                ))}
-              </div>
-            </div>
+
+                  {/* Slide Tabs Navigation (if items span multiple slides) */}
+                  {availablePreviewSlides.length > 1 && (
+                    <div className="flex items-center justify-between gap-2 bg-slate-50 p-1.5 rounded-xl border border-slate-200">
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (currentSlideIndex > 0) {
+                              setSelectedPreviewSlide(availablePreviewSlides[currentSlideIndex - 1]);
+                            } else if (selectedPreviewSlide === 'all') {
+                              setSelectedPreviewSlide(availablePreviewSlides[0]);
+                            }
+                          }}
+                          disabled={currentSlideIndex <= 0 && selectedPreviewSlide !== 'all'}
+                          className="p-1 rounded text-slate-500 hover:bg-slate-200 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                          title="Předchozí snímek"
+                        >
+                          <ChevronLeft className="w-3.5 h-3.5" />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setSelectedPreviewSlide('all')}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                            selectedPreviewSlide === 'all'
+                              ? 'bg-blue-600 text-white shadow-xs'
+                              : 'text-slate-600 hover:bg-slate-200'
+                          }`}
+                        >
+                          {t('allSlides', 'Všechny')} ({previewResults.length})
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-1 overflow-x-auto max-w-[340px] py-0.5">
+                        {availablePreviewSlides.map((num) => {
+                          const count = previewResults.filter((p) => p.slideNumber === num).length;
+                          const isSel = selectedPreviewSlide === num;
+                          return (
+                            <button
+                              key={`prev-tab-${num}`}
+                              type="button"
+                              onClick={() => setSelectedPreviewSlide(num)}
+                              className={`px-2 py-1 rounded-lg text-xs font-bold shrink-0 transition-all ${
+                                isSel
+                                  ? 'bg-blue-600 text-white shadow-xs ring-2 ring-blue-500/20'
+                                  : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200/80'
+                              }`}
+                            >
+                              <span>#{num}</span>
+                              <span className="ml-1 text-[10px] opacity-75 font-normal">({count})</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (selectedPreviewSlide === 'all') {
+                            setSelectedPreviewSlide(availablePreviewSlides[0]);
+                          } else if (currentSlideIndex < availablePreviewSlides.length - 1) {
+                            setSelectedPreviewSlide(availablePreviewSlides[currentSlideIndex + 1]);
+                          }
+                        }}
+                        disabled={currentSlideIndex >= availablePreviewSlides.length - 1}
+                        className="p-1 rounded text-slate-500 hover:bg-slate-200 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                        title="Další snímek"
+                      >
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+                    {filteredPreviewResults.map((item, idx) => (
+                      <div
+                        key={item.id}
+                        className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/90 text-xs space-y-2 hover:border-slate-300 transition-colors"
+                      >
+                        <div className="flex items-center justify-between text-slate-500 font-semibold text-[10px]">
+                          <span className="flex items-center gap-1.5">
+                            {item.slideNumber && (
+                              <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-bold">
+                                Snímek #{item.slideNumber}
+                              </span>
+                            )}
+                            <span className="text-slate-400">Položka #{idx + 1}</span>
+                          </span>
+                          {item.notes && <span className="text-emerald-700 font-medium">{item.notes}</span>}
+                        </div>
+
+                        {/* Side-by-side comparison of original text vs translated */}
+                        {item.originalText && (
+                          <div className="space-y-1 bg-white p-2 rounded-lg border border-slate-200/80">
+                            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
+                              Původní text:
+                            </span>
+                            <p className="text-slate-600 font-normal whitespace-pre-wrap">{item.originalText}</p>
+                          </div>
+                        )}
+
+                        <div className="space-y-1 bg-emerald-50/70 p-2.5 rounded-lg border border-emerald-200/80">
+                          <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-700 flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                            Nový překlad:
+                          </span>
+                          <p className="text-slate-900 font-semibold whitespace-pre-wrap">{item.translatedText}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()
           )}
         </div>
 

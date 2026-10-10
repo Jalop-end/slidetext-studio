@@ -9,10 +9,13 @@ import {
   Lightbulb,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
   Layers,
   Link as LinkIcon,
+  Eye,
+  CheckCircle2,
 } from 'lucide-react';
-import { PptxDocument, PptxParagraph } from '../types/pptx';
+import { PptxDocument, PptxParagraph, PptxSlide } from '../types/pptx';
 import { useLanguage } from '../context/LanguageContext';
 
 interface DocumentEditorProps {
@@ -24,6 +27,7 @@ interface DocumentEditorProps {
   currentSlideNumber: number;
   onSlideChange: (slideNumber: number) => void;
   onSingleTranslate: (paragraph: PptxParagraph) => void;
+  onTranslateSlide?: (slideNumber: number) => void;
   onSinglePolish: (paragraph: PptxParagraph) => void;
   onUpdateSpeakerNotes: (slideNumber: number, newNotes: string) => void;
   onUpdateParagraphHyperlink: (paragraphId: string, newUrl: string) => void;
@@ -38,11 +42,14 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
   currentSlideNumber,
   onSlideChange,
   onSingleTranslate,
+  onTranslateSlide,
   onSinglePolish,
   onUpdateSpeakerNotes,
   onUpdateParagraphHyperlink,
 }) => {
   const { t } = useLanguage();
+  // View mode: 'single' (only current slide), 'modified' (only slides with changes), 'all' (all slides)
+  const [viewFilter, setViewFilter] = useState<'single' | 'modified' | 'all'>('single');
   const [collapsedSlides, setCollapsedSlides] = useState<Record<number, boolean>>({});
   const [showDiffMap, setShowDiffMap] = useState<Record<string, boolean>>({});
   const itemRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -71,38 +78,221 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
     }));
   };
 
+  const handlePrevSlide = () => {
+    if (currentSlideNumber > 1) {
+      onSlideChange(currentSlideNumber - 1);
+    }
+  };
+
+  const handleNextSlide = () => {
+    if (currentSlideNumber < document.slides.length) {
+      onSlideChange(currentSlideNumber + 1);
+    }
+  };
+
+  const modifiedSlides = document.slides.filter(
+    (s) => s.shapes.some((sh) => sh.paragraphs.some((p) => p.isModified)) || !!s.speakerNotes?.isModified
+  );
+  const totalModifiedSlidesCount = modifiedSlides.length;
+
+  const areAllSlideDiffsOpen = (slide: PptxSlide) => {
+    const modParas = slide.shapes.flatMap((sh) => sh.paragraphs.filter((p) => p.isModified));
+    return modParas.length > 0 && modParas.every((p) => !!showDiffMap[p.id]);
+  };
+
+  const toggleAllSlideDiffs = (slide: PptxSlide) => {
+    const currentlyOpen = areAllSlideDiffsOpen(slide);
+    const modParas = slide.shapes.flatMap((sh) => sh.paragraphs.filter((p) => p.isModified));
+    setShowDiffMap((prev) => {
+      const next = { ...prev };
+      modParas.forEach((p) => {
+        next[p.id] = !currentlyOpen;
+      });
+      return next;
+    });
+  };
+
+  const displayedSlides =
+    viewFilter === 'single'
+      ? document.slides.filter((s) => s.slideNumber === currentSlideNumber)
+      : viewFilter === 'modified'
+      ? modifiedSlides
+      : document.slides;
+
   return (
     <div className="flex-1 overflow-y-auto bg-slate-100/70 p-4 sm:p-6 lg:p-8 font-sans">
-      <div className="max-w-4xl mx-auto space-y-8">
-        {/* Document Intro / Document Header */}
-        <div className="bg-white rounded-xl p-5 shadow-xs border border-slate-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-600 shrink-0">
-              <FileText className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-base font-bold text-slate-900">
-                {t('docOverviewTitle', 'Textový přehled prezentace')}
-              </h2>
-              <p className="text-xs text-slate-500">
-                {t(
-                  'docOverviewSubtitle',
-                  'Texty jsou uspořádány podle pořadí snímků a odstavců. Kliknutím na mini-odkaz se prvek zaměří na snímku.'
+      <div className="max-w-4xl mx-auto space-y-6">
+        {/* Slide Selector & Navigation Toolbar */}
+        <div className="bg-white rounded-xl p-4 shadow-xs border border-slate-200/80 sticky top-0 z-20 space-y-3">
+          {/* Row 1: Mode toggle & Slide pagination */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            {/* Mode pills */}
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200">
+              <button
+                type="button"
+                onClick={() => setViewFilter('single')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  viewFilter === 'single'
+                    ? 'bg-white text-blue-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title={t('singleSlideViewTooltip', 'Zobrazit pouze jeden vybraný snímek bez nutnosti skrolování')}
+              >
+                <Eye className="w-3.5 h-3.5" />
+                <span>{t('singleSlideView', 'Vybraný snímek')}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setViewFilter('modified')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  viewFilter === 'modified'
+                    ? 'bg-white text-amber-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title={t('onlyModifiedTooltip', 'Zobrazit pouze snímky, na kterých byly provedeny změny')}
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                <span>{t('onlyModifiedSlides', 'Pouze se změnami')}</span>
+                {totalModifiedSlidesCount > 0 && (
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-100 text-amber-800 font-extrabold">
+                    {totalModifiedSlidesCount}
+                  </span>
                 )}
-              </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setViewFilter('all')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  viewFilter === 'all'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title={t('allSlidesTooltip', 'Zobrazit celou prezentaci jako souvislý dokument')}
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>{t('allSlidesView', 'Všechny snímky')}</span>
+              </button>
+            </div>
+
+            {/* Prev / Next & Slide Dropdown */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handlePrevSlide}
+                disabled={currentSlideNumber <= 1}
+                className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                title="Předchozí snímek"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+
+              {/* Select dropdown */}
+              <select
+                value={currentSlideNumber}
+                onChange={(e) => {
+                  const num = Number(e.target.value);
+                  onSlideChange(num);
+                }}
+                className="text-xs font-bold bg-slate-50 border border-slate-200 text-slate-800 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500/20 max-w-[200px] truncate"
+              >
+                {document.slides.map((s) => {
+                  const modCount = s.shapes.reduce(
+                    (acc, sh) => acc + sh.paragraphs.filter((p) => p.isModified).length,
+                    0
+                  );
+                  return (
+                    <option key={`opt-slide-${s.slideNumber}`} value={s.slideNumber}>
+                      {`#${s.slideNumber}: ${s.title || 'Snímek ' + s.slideNumber}${
+                        modCount > 0 ? ` (${modCount} změn)` : ''
+                      }`}
+                    </option>
+                  );
+                })}
+              </select>
+
+              <button
+                type="button"
+                onClick={handleNextSlide}
+                disabled={currentSlideNumber >= document.slides.length}
+                className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                title="Další snímek"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
           </div>
-          <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200/60">
-            <Layers className="w-3.5 h-3.5 text-slate-400" />
-            <span>
-              {t('total', 'Celkem')} <strong>{document.slides.length}</strong>{' '}
-              {t('slidesCount', 'snímků')}
-            </span>
+
+          {/* Row 2: Slide Pills Scroll */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-0.5">
+            {document.slides.map((s) => {
+              const isSelected = s.slideNumber === currentSlideNumber;
+              const modCount = s.shapes.reduce(
+                (acc, sh) => acc + sh.paragraphs.filter((p) => p.isModified).length,
+                0
+              );
+              return (
+                <button
+                  key={`pill-slide-${s.slideNumber}`}
+                  type="button"
+                  onClick={() => {
+                    onSlideChange(s.slideNumber);
+                    if (viewFilter === 'all') {
+                      const el = window.document.getElementById(`slide-page-${s.slideNumber}`);
+                      el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                  }}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
+                    isSelected
+                      ? 'bg-blue-600 text-white shadow-xs ring-2 ring-blue-500/30'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  <span>#{s.slideNumber}</span>
+                  {modCount > 0 && (
+                    <span
+                      className={`w-2 h-2 rounded-full ${
+                        isSelected ? 'bg-amber-300' : 'bg-emerald-500'
+                      }`}
+                      title={`${modCount} upravených textů`}
+                    />
+                  )}
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        {/* Slides rendering as Word Pages */}
-        {document.slides.map((slide) => {
+        {/* Empty state when filtering for modified slides but none found */}
+        {viewFilter === 'modified' && displayedSlides.length === 0 && (
+          <div className="bg-white rounded-xl p-8 border border-slate-200/80 text-center shadow-xs space-y-3">
+            <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-500 mx-auto flex items-center justify-center">
+              <CheckCircle2 className="w-6 h-6 text-emerald-500" />
+            </div>
+            <h3 className="font-bold text-slate-900 text-sm">
+              {t('noModifiedSlidesTitle', 'Zatím nebyly provedeny žádné úpravy')}
+            </h3>
+            <p className="text-xs text-slate-500 max-w-sm mx-auto">
+              {t(
+                'noModifiedSlidesDesc',
+                'Všechny texty jsou v původním stavu. Zvolte "Vybraný snímek" pro editaci nebo spusťte překlad prezentace.'
+              )}
+            </p>
+            <div className="flex items-center justify-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setViewFilter('single')}
+                className="px-3.5 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-700 transition-colors"
+              >
+                {t('showCurrentSlide', 'Zobrazit vybraný snímek')}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Slides rendering */}
+        {displayedSlides.map((slide) => {
           const isCurrent = slide.slideNumber === currentSlideNumber;
           const isCollapsed = !!collapsedSlides[slide.slideNumber];
 
@@ -171,6 +361,40 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
+                  {onTranslateSlide && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onTranslateSlide(slide.slideNumber);
+                      }}
+                      className="text-xs font-semibold px-2.5 py-1 rounded-md text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 flex items-center gap-1.5 transition-colors"
+                      title={t('translateSlideTooltip', 'Přeložit všechny texty na tomto snímku')}
+                    >
+                      <Languages className="w-3.5 h-3.5 text-indigo-600" />
+                      <span>{t('translateSlide', 'Přeložit snímek')}</span>
+                    </button>
+                  )}
+
+                  {slideModifiedCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleAllSlideDiffs(slide);
+                      }}
+                      className="text-xs font-semibold px-2.5 py-1 rounded-md text-amber-800 bg-amber-100 hover:bg-amber-200 border border-amber-300 flex items-center gap-1.5 transition-colors"
+                      title={t('toggleAllSlideDiffsTooltip', 'Přepnout porovnání pro všechny upravené texty na tomto snímku')}
+                    >
+                      <Sparkles className="w-3 h-3 text-amber-600" />
+                      <span>
+                        {areAllSlideDiffsOpen(slide)
+                          ? t('hideSlideDiffs', 'Skrýt porovnání')
+                          : t('showSlideDiffs', 'Porovnat změny')}
+                      </span>
+                    </button>
+                  )}
+
                   {/* Jump button to slide */}
                   <button
                     type="button"
@@ -212,7 +436,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                                   ? 'bg-amber-100 text-amber-800 border border-amber-200'
                                   : shape.role === 'subtitle'
                                   ? 'bg-orange-100 text-orange-800 border border-orange-200'
-                                  : shape.role === 'table-cell'
+                                  : shape.role === 'table-cell' || shape.isTable
                                   ? 'bg-purple-100 text-purple-800 border border-purple-200'
                                   : 'bg-slate-100 text-slate-700 border border-slate-200'
                               }`}
@@ -221,7 +445,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                                 ? t('titleShape', 'Nadpis snímku')
                                 : shape.role === 'subtitle'
                                 ? t('subtitleShape', 'Podnadpis')
-                                : shape.role === 'table-cell'
+                                : shape.role === 'table-cell' || shape.isTable
                                 ? t('tableShape', 'Tabulka')
                                 : t('bodyShape', 'Textové pole / Odrážky')}
                             </span>
@@ -229,6 +453,21 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                               {shape.name}
                             </span>
                           </div>
+
+                          {(shape.role === 'table-cell' || shape.isTable) && onTranslateSlide && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onTranslateSlide(slide.slideNumber);
+                              }}
+                              className="text-[11px] font-semibold text-purple-700 hover:text-purple-900 bg-purple-50 hover:bg-purple-100 px-2 py-0.5 rounded border border-purple-200 flex items-center gap-1 transition-colors"
+                              title="Přeložit všechny buňky v této tabulce"
+                            >
+                              <Languages className="w-3 h-3 text-purple-600" />
+                              <span>Přeložit celou tabulku</span>
+                            </button>
+                          )}
                         </div>
 
                         {/* Paragraphs in shape */}

@@ -114,7 +114,7 @@ export async function parsePptxFile(file: File | Blob | ArrayBuffer, fileName: s
 
     // Process tables
     gfElements.forEach((gf, gfIdx) => {
-      const tableShape = parseTableElement(gf, spElements.length + gfIdx, slideNum, slideWidthEmu, slideHeightEmu, rels);
+      const tableShape = parseTableElement(gf, gfIdx, slideNum, slideWidthEmu, slideHeightEmu, rels);
       if (tableShape) {
         shapes.push(tableShape);
       }
@@ -325,7 +325,7 @@ function parseTableElement(
             slideNum,
             rels
           );
-          if (para && para.currentText.trim().length > 0) {
+          if (para) {
             paragraphs.push(para);
           }
         });
@@ -372,62 +372,71 @@ function parseParagraphElement(
   let fullText = '';
   let paragraphHyperlink = defaultHlink;
 
-  // Scan child elements: <a:r>, <a:fld>, etc.
-  const runElements = Array.from(pElem.querySelectorAll('a\\:r, r, a\\:fld, fld'));
+  // Scan child elements preserving order: <a:r>, <a:fld>, and line breaks <a:br>
+  const childElements = Array.from(pElem.children);
+  let runCounter = 0;
 
-  runElements.forEach((rElem, rIdx) => {
-    const tElem = rElem.querySelector('a\\:t, t');
-    const text = tElem?.textContent || '';
-    if (text) {
-      fullText += text;
+  childElements.forEach((child) => {
+    const localName = child.localName || child.nodeName;
+    if (localName.endsWith('br')) {
+      fullText += '\n';
+      return;
+    }
 
-      const rPr = rElem.querySelector('a\\:rPr, rPr');
-      const isBold = rPr?.getAttribute('b') === '1' || rPr?.getAttribute('b') === 'true';
-      const isItalic = rPr?.getAttribute('i') === '1' || rPr?.getAttribute('i') === 'true';
-      const sz = rPr?.getAttribute('sz');
-      const fontSizePt = sz ? parseInt(sz, 10) / 100 : undefined;
+    if (localName.endsWith('r') || localName.endsWith('fld')) {
+      const tElems = Array.from(child.querySelectorAll('a\\:t, t'));
+      const text = tElems.map((t) => t.textContent || '').join('');
+      if (text) {
+        fullText += text;
 
-      const srgbClr = rPr?.querySelector('a\\:srgbClr, srgbClr');
-      const colorHex = srgbClr?.getAttribute('val') ? `#${srgbClr.getAttribute('val')}` : undefined;
+        const rPr = child.querySelector('a\\:rPr, rPr');
+        const isBold = rPr?.getAttribute('b') === '1' || rPr?.getAttribute('b') === 'true';
+        const isItalic = rPr?.getAttribute('i') === '1' || rPr?.getAttribute('i') === 'true';
+        const sz = rPr?.getAttribute('sz');
+        const fontSizePt = sz ? parseInt(sz, 10) / 100 : undefined;
 
-      // Extract run hyperlink
-      const hlinkClick = rPr?.querySelector('a\\:hlinkClick, hlinkClick');
-      let runHlink = defaultHlink;
+        const srgbClr = rPr?.querySelector('a\\:srgbClr, srgbClr');
+        const colorHex = srgbClr?.getAttribute('val') ? `#${srgbClr.getAttribute('val')}` : undefined;
 
-      if (hlinkClick) {
-        const rId = hlinkClick.getAttribute('r:id') || hlinkClick.getAttribute('id') || undefined;
-        const tooltip = hlinkClick.getAttribute('tooltip') || undefined;
-        let url = rId && rels && rels[rId] ? rels[rId].target : undefined;
-        if (!url) {
-          url = hlinkClick.getAttribute('action') || hlinkClick.getAttribute('invalidUrl') || undefined;
+        // Extract run hyperlink
+        const hlinkClick = rPr?.querySelector('a\\:hlinkClick, hlinkClick');
+        let runHlink = defaultHlink;
+
+        if (hlinkClick) {
+          const rId = hlinkClick.getAttribute('r:id') || hlinkClick.getAttribute('id') || undefined;
+          const tooltip = hlinkClick.getAttribute('tooltip') || undefined;
+          let url = rId && rels && rels[rId] ? rels[rId].target : undefined;
+          if (!url) {
+            url = hlinkClick.getAttribute('action') || hlinkClick.getAttribute('invalidUrl') || undefined;
+          }
+          if (url) {
+            runHlink = { url, tooltip, rId };
+            if (!paragraphHyperlink) paragraphHyperlink = runHlink;
+          }
         }
-        if (url) {
-          runHlink = { url, tooltip, rId };
-          if (!paragraphHyperlink) paragraphHyperlink = runHlink;
+
+        // Detect URL in text if no XML hyperlink
+        if (!runHlink) {
+          const urlMatch = text.match(/https?:\/\/[^\s]+|www\.[^\s]+/);
+          if (urlMatch) {
+            runHlink = {
+              url: urlMatch[0].startsWith('www.') ? `https://${urlMatch[0]}` : urlMatch[0],
+              tooltip: urlMatch[0],
+            };
+            if (!paragraphHyperlink) paragraphHyperlink = runHlink;
+          }
         }
+
+        runs.push({
+          id: `run-${runCounter++}`,
+          text,
+          isBold,
+          isItalic,
+          fontSizePt,
+          colorHex,
+          hyperlink: runHlink,
+        });
       }
-
-      // Detect URL in text if no XML hyperlink
-      if (!runHlink) {
-        const urlMatch = text.match(/https?:\/\/[^\s]+|www\.[^\s]+/);
-        if (urlMatch) {
-          runHlink = {
-            url: urlMatch[0].startsWith('www.') ? `https://${urlMatch[0]}` : urlMatch[0],
-            tooltip: urlMatch[0],
-          };
-          if (!paragraphHyperlink) paragraphHyperlink = runHlink;
-        }
-      }
-
-      runs.push({
-        id: `run-${rIdx}`,
-        text,
-        isBold,
-        isItalic,
-        fontSizePt,
-        colorHex,
-        hyperlink: runHlink,
-      });
     }
   });
 

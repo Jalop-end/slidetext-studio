@@ -41,6 +41,7 @@ export default function App() {
   const [isPreSaveOpen, setIsPreSaveOpen] = useState(false);
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
   const [activeSingleParagraph, setActiveSingleParagraph] = useState<PptxParagraph | null>(null);
+  const [translateScope, setTranslateScope] = useState<'all' | 'current' | 'single'>('all');
 
   // History stack for Undo / Redo
   const [history, setHistory] = useState<PptxDocument[]>([]);
@@ -353,13 +354,13 @@ export default function App() {
         const updatedParagraphs = shape.paragraphs.map((p) => {
           if (resultMap.has(p.id)) {
             const res = resultMap.get(p.id)!;
-            const isMod = res.translatedText.trim() !== p.originalText.trim();
-            if (isMod) modCount++;
+            const textChanged = res.translatedText.trim() !== p.originalText.trim();
+            modCount++;
             return {
               ...p,
               currentText: res.translatedText,
-              isModified: isMod,
-              aiNotes: res.notes,
+              isModified: true, // Always mark true so every translated element is tracked and marked edited
+              aiNotes: res.notes || (textChanged ? 'Přeloženo' : 'Přeloženo (beze změny)'),
               lengthFitWarning: res.lengthFitWarning,
             };
           }
@@ -374,10 +375,11 @@ export default function App() {
       const notesId = `slide-${slide.slideNumber}-notes`;
       if (resultMap.has(notesId) && slide.speakerNotes) {
         const res = resultMap.get(notesId)!;
+        modCount++;
         updatedNotes = {
           ...slide.speakerNotes,
           text: res.translatedText,
-          isModified: res.translatedText !== slide.speakerNotes.originalText,
+          isModified: true,
         };
       }
 
@@ -389,9 +391,8 @@ export default function App() {
       slides: updatedSlides,
       modifiedCount: modCount,
     };
-
     commitDocumentChange(newDoc);
-    showToast(`Úspěšně přeloženo a aplikováno ${results.length} textů.`);
+    showToast(t('translationsApplied', 'Překlady byly úspěšně aplikovány do prezentace!'));
   };
 
   const handleApplyPolished = (results: PolishResultItem[]) => {
@@ -541,9 +542,17 @@ export default function App() {
     showToast(newUrl.trim() ? 'Odkaz k textu byl úspěšně uložen.' : 'Odkaz byl odebrán.');
   };
 
-  // Single-paragraph quick triggers
+  // Single-paragraph & slide-level quick triggers
   const handleSingleTranslate = (paragraph: PptxParagraph) => {
     setActiveSingleParagraph(paragraph);
+    setTranslateScope('single');
+    setIsTranslateOpen(true);
+  };
+
+  const handleTranslateSlide = (slideNum: number) => {
+    setCurrentSlideNumber(slideNum);
+    setActiveSingleParagraph(null);
+    setTranslateScope('current');
     setIsTranslateOpen(true);
   };
 
@@ -605,6 +614,7 @@ export default function App() {
         onRenameDocument={handleRenameDocument}
         onOpenTranslate={() => {
           setActiveSingleParagraph(null);
+          setTranslateScope('all');
           setIsTranslateOpen(true);
         }}
         onOpenPolish={() => {
@@ -639,6 +649,7 @@ export default function App() {
               currentSlideNumber={currentSlideNumber}
               onSlideChange={setCurrentSlideNumber}
               onSingleTranslate={handleSingleTranslate}
+              onTranslateSlide={handleTranslateSlide}
               onSinglePolish={handleSinglePolish}
               onUpdateSpeakerNotes={handleUpdateSpeakerNotes}
               onUpdateParagraphHyperlink={handleUpdateParagraphHyperlink}
@@ -672,7 +683,7 @@ export default function App() {
       {/* AI Modals – mounted only when open (keyed) so their internal state resets on every opening */}
       {isTranslateOpen && (
         <AiTranslationModal
-          key={`translate-${activeSingleParagraph?.id ?? 'all'}`}
+          key={`translate-${translateScope}-${activeSingleParagraph?.id ?? currentSlideNumber}`}
           isOpen={isTranslateOpen}
           onClose={() => {
             setIsTranslateOpen(false);
@@ -681,6 +692,7 @@ export default function App() {
           document={document}
           currentSlideNumber={currentSlideNumber}
           initialParagraph={activeSingleParagraph}
+          initialScope={translateScope}
           onApplyTranslations={handleApplyTranslations}
         />
       )}

@@ -21,15 +21,96 @@ app.use(express.json({ limit: '50mb' }));
 // Gemma 4 AI Configuration (Local via Ollama - NO GEMINI API KEY REQUIRED)
 // ---------------------------------------------------------------------------
 const OLLAMA_HOST = process.env.OLLAMA_HOST || 'http://127.0.0.1:11434';
-const GEMMA_MODEL = process.env.GEMMA_MODEL || 'gemma4:latest';
+let GEMMA_MODEL = process.env.GEMMA_MODEL || 'gemma4:latest';
 
 console.log('🤖 AI Engine: Gemma 4 (Ollama)', {
   host: OLLAMA_HOST,
   model: GEMMA_MODEL,
 });
 
+// Helper: Auto-detect matching Gemma model installed in Ollama
+async function getAvailableGemmaModel(): Promise<string> {
+  try {
+    const res = await fetch(`${OLLAMA_HOST}/api/tags`, { signal: AbortSignal.timeout(3000) });
+    if (res.ok) {
+      const data: any = await res.json();
+      const models: string[] = (data?.models || []).map((m: any) => m.name || m.model || '');
+      if (models.includes(GEMMA_MODEL)) {
+        return GEMMA_MODEL;
+      }
+      // If exact tag not found, find any installed model containing 'gemma'
+      const found = models.find((m) => m.toLowerCase().includes('gemma'));
+      if (found) {
+        GEMMA_MODEL = found;
+        return found;
+      }
+    }
+  } catch {}
+  return GEMMA_MODEL;
+}
+
+// Helper: Try parsing JSON directly, then fallback to sanitizing raw control characters/tabs
+function tryParseJsonWithSanitization(str: string): any {
+  if (!str || typeof str !== 'string') return null;
+  try {
+    return JSON.parse(str);
+  } catch {}
+  try {
+    const sanitized = str
+      .replace(/\t/g, '\\t')
+      .replace(/[\u0000-\u001f]/g, (ch) => (ch === '\n' || ch === '\r' ? ch : ''));
+    return JSON.parse(sanitized);
+  } catch {}
+  return null;
+}
+
+// Helper: Robust JSON extraction from LLM output (handles thoughts, markdown fences, partial text)
+function extractJsonFromText(rawText: string): any {
+  let text = (rawText || '').trim();
+  if (!text) {
+    throw new Error('Model vrátil prázdný výstup.');
+  }
+
+  // 1. Strip reasoning / thinking blocks: <think>...</think>, <thought>...</thought>
+  text = text.replace(/<(?:think|thought)[\s\S]*?<\/(?:think|thought)>/gi, '').trim();
+
+  // 2. Look for code fences: ```json ... ``` or ``` ... ``` anywhere in text
+  const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (fenceMatch) {
+    const res = tryParseJsonWithSanitization(fenceMatch[1].trim());
+    if (res !== null) return res;
+  }
+
+  // 3. Try parsing text directly
+  const direct = tryParseJsonWithSanitization(text);
+  if (direct !== null) return direct;
+
+  // 4. Find first { or [ and last matching } or ]
+  const firstBrace = text.indexOf('{');
+  const firstBracket = text.indexOf('[');
+  let startIdx = -1;
+  let endIdx = -1;
+
+  if (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) {
+    startIdx = firstBrace;
+    endIdx = text.lastIndexOf('}');
+  } else if (firstBracket !== -1) {
+    startIdx = firstBracket;
+    endIdx = text.lastIndexOf(']');
+  }
+
+  if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+    const candidate = text.slice(startIdx, endIdx + 1);
+    const candidateParsed = tryParseJsonWithSanitization(candidate);
+    if (candidateParsed !== null) return candidateParsed;
+  }
+
+  throw new Error(`Nelze dekódovat JSON z výstupu modelu: ${text.slice(0, 100)}`);
+}
+
 // Helper: Call local Gemma 4 via Ollama
 async function callGemmaJson(prompt: string, timeoutMs = 60000): Promise<any> {
+  const modelToUse = await getAvailableGemmaModel();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -38,7 +119,7 @@ async function callGemmaJson(prompt: string, timeoutMs = 60000): Promise<any> {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: GEMMA_MODEL,
+        model: modelToUse,
         prompt,
         format: 'json',
         stream: false,
@@ -51,28 +132,18 @@ async function callGemmaJson(prompt: string, timeoutMs = 60000): Promise<any> {
 
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
-      throw new Error(`Ollama (Gemma 4) vrátila HTTP ${res.status}: ${errText.slice(0, 150)}`);
+      throw new Error(`Ollama (${modelToUse}) vrátila HTTP ${res.status}: ${errText.slice(0, 150)}`);
     }
 
     const data: any = await res.json();
-    let text = (data?.response || '').trim();
-    if (!text) {
-      throw new Error('Model Gemma 4 vrátil prázdný výstup.');
-    }
-
-    // Strip markdown code fences if present
-    if (text.startsWith('```')) {
-      text = text.replace(/^```[a-z]*\s*/i, '').replace(/\s*```$/i, '').trim();
-    }
-
-    return JSON.parse(text);
+    return extractJsonFromText(data?.response || '');
   } catch (err: any) {
     if (err.name === 'AbortError') {
-      throw new Error(`Gemma 4 neodpověděla v časovém limitu ${Math.round(timeoutMs / 1000)} s.`);
+      throw new Error(`Gemma (${modelToUse}) neodpověděla v časovém limitu ${Math.round(timeoutMs / 1000)} s.`);
     }
     if (err.code === 'ECONNREFUSED' || /fetch failed/i.test(err.message)) {
       throw new Error(
-        `Nelze se spojit s Ollama na ${OLLAMA_HOST}. Ujistěte se, že aplikace Ollama běží (model: ${GEMMA_MODEL}).`
+        `Nelze se spojit s Ollama na ${OLLAMA_HOST}. Ujistěte se, že aplikace Ollama běží (model: ${modelToUse}).`
       );
     }
     throw err;
@@ -230,8 +301,11 @@ async function translateWithGoogleFreeWeb(
 
     chunkPromises.push(
       (async () => {
-        const DELIM = ' ___SPLIT___ ';
-        const joined = chunk.map((t) => (t || '').trim() || ' ').join(DELIM);
+        // Use bracketed indices ⟦0⟧, ⟦1⟧ which Google Translate preserves 100% without translation
+        const joined = chunk
+          .map((t, idx) => `⟦${idx}⟧ ${(t || '').trim() || ' '}`)
+          .join(' ');
+
         try {
           const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${encodeURIComponent(
             targetIso
@@ -240,38 +314,47 @@ async function translateWithGoogleFreeWeb(
           if (res.ok) {
             const json: any = await res.json();
             const translatedJoined = (json?.[0] || []).map((part: any) => part?.[0] || '').join('');
-            const parts = translatedJoined.split(/___SPLIT___/i).map((s: string) => decodeHtmlEntities(s.trim()));
-            if (parts.length === chunk.length) {
-              parts.forEach((p: string, offset: number) => {
-                results[startIdx + offset] = p || chunk[offset];
+            const matches = [...translatedJoined.matchAll(/⟦\s*(\d+)\s*⟧\s*([^⟦]*)/g)];
+            if (matches.length > 0) {
+              matches.forEach((m) => {
+                const subIdx = parseInt(m[1], 10);
+                if (subIdx >= 0 && subIdx < chunk.length) {
+                  const cleaned = decodeHtmlEntities(m[2].trim());
+                  if (cleaned) {
+                    results[startIdx + subIdx] = cleaned;
+                  }
+                }
               });
-              return;
             }
           }
         } catch (_) {}
 
-        // Fallback per-item if delimiter count differed or batch request failed
-        await Promise.all(
-          chunk.map(async (text, offset) => {
-            const idx = startIdx + offset;
-            const clean = (text || '').trim();
-            if (!clean) {
-              results[idx] = text;
-              return;
-            }
-            try {
-              const u = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${encodeURIComponent(
-                targetIso
-              )}&dt=t&q=${encodeURIComponent(clean)}`;
-              const r = await fetch(u, { signal: AbortSignal.timeout(6000) });
+        // Fallback per-item for any index in chunk that didn't receive a translation
+        for (let offset = 0; offset < chunk.length; offset++) {
+          const idx = startIdx + offset;
+          if (results[idx] !== undefined && results[idx].trim().length > 0) continue;
+
+          const clean = (chunk[offset] || '').trim();
+          if (!clean) {
+            results[idx] = chunk[offset];
+            continue;
+          }
+          try {
+            const u = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${encodeURIComponent(
+              targetIso
+            )}&dt=t&q=${encodeURIComponent(clean)}`;
+            const r = await fetch(u, { signal: AbortSignal.timeout(6000) });
+            if (r.ok) {
               const j: any = await r.json();
               const translated = (j?.[0] || []).map((part: any) => part?.[0] || '').join('');
               results[idx] = decodeHtmlEntities(translated) || clean;
-            } catch {
+            } else {
               results[idx] = clean;
             }
-          })
-        );
+          } catch {
+            results[idx] = clean;
+          }
+        }
       })()
     );
   }
@@ -281,7 +364,7 @@ async function translateWithGoogleFreeWeb(
 }
 
 // ---------------------------------------------------------------------------
-// Local Gemma 4 Translator (Chunked in batches of 4 items with zero timeout)
+// Local Gemma 4 Translator (Sequential integer IDs + 100% Google Free Web coverage)
 // ---------------------------------------------------------------------------
 async function translateWithGemma(
   items: { id: string; text: string }[],
@@ -292,44 +375,82 @@ async function translateWithGemma(
 
   for (let i = 0; i < items.length; i += batchSize) {
     const chunk = items.slice(i, i + batchSize);
+    // Use sequential integer IDs (0, 1, 2, 3) so Gemma never truncates or hallucinates complex IDs
+    const gemmaItems = chunk.map((c, idx) => ({ id: idx, text: c.text }));
     const prompt = `Jsi profesionální překladatel PowerPoint prezentací.
 Přelož text každé položky přesně do cílového jazyka: "${targetLanguage}".
 POKYNY:
-1. Vstup má přesně ${chunk.length} prvků. Výstup MUSÍ mít přesně ${chunk.length} prvků se stejnými 'id'.
-2. Zachovej číslování, odrážky a URL adresy.
-3. Překládej přirozeně a stručně pro prezentační slidy.
+1. Vstup má přesně ${chunk.length} prvků (s číselnými id od 0 do ${chunk.length - 1}).
+2. Výstup MUSÍ mít přesně ${chunk.length} prvků se stejnými číselnými 'id'.
+3. Zachovej číslování, odrážky a URL adresy.
+4. Překládej přirozeně a stručně pro prezentační slidy.
 
 Vrať POUZE platný JSON ve formátu:
-{"translations": [{"id": "string", "translatedText": "string"}]}
+{"translations": [{"id": 0, "translatedText": "string"}]}
 
 POLOŽKY:
-${JSON.stringify(chunk)}`;
+${JSON.stringify(gemmaItems)}`;
 
-    let chunkSuccess = false;
     try {
       const parsed = await callGemmaJson(prompt, 45000);
-      if (parsed && Array.isArray(parsed.translations)) {
-        parsed.translations.forEach((t: any) => {
-          if (t?.id && t?.translatedText) {
-            map.set(String(t.id), t.translatedText);
+      const list: any[] = Array.isArray(parsed)
+        ? parsed
+        : Array.isArray(parsed?.translations)
+        ? parsed.translations
+        : Array.isArray(parsed?.items)
+        ? parsed.items
+        : Array.isArray(parsed?.data)
+        ? parsed.data
+        : [];
+
+      list.forEach((t: any, idx: number) => {
+        const textVal =
+          t?.translatedText ||
+          t?.translated_text ||
+          t?.translation ||
+          t?.target ||
+          t?.text ||
+          t?.output ||
+          '';
+
+        if (textVal && typeof textVal === 'string' && textVal.trim()) {
+          const numId = Number(t?.id);
+          const originalItem = !isNaN(numId) && chunk[numId] ? chunk[numId] : chunk[idx];
+          if (originalItem) {
+            map.set(originalItem.id, textVal.trim());
           }
-        });
-        chunkSuccess = true;
-      }
+        }
+      });
     } catch (err: any) {
-      console.warn(`Gemma 4 chunk ${Math.floor(i / batchSize) + 1} warning:`, err.message);
+      console.warn(`Gemma chunk ${Math.floor(i / batchSize) + 1} warning:`, err.message);
     }
 
-    // Fallback this chunk to Google Free Web if Gemma failed or missed items
-    if (!chunkSuccess) {
-      const missing = chunk.filter((c) => !map.has(c.id));
-      if (missing.length > 0) {
+    // ALWAYS ensure 100% translation coverage:
+    // If Gemma missed ANY item in this chunk (dropped item, ID mismatch, empty response, or timeout),
+    // immediately translate those missing items with Google Free Web fallback.
+    const missing = chunk.filter((c) => {
+      const val = map.get(c.id);
+      return !val || !val.trim();
+    });
+
+    if (missing.length > 0) {
+      console.log(
+        `[Gemma coverage] ${missing.length}/${chunk.length} položek chybělo od Gemma. Doplňuji překlad přes Google Free Web...`
+      );
+      try {
         const missingTexts = missing.map((m) => m.text);
         const translated = await translateWithGoogleFreeWeb(missingTexts, targetLanguage);
         missing.forEach((m, idx) => {
-          if (translated[idx]) {
-            map.set(m.id, translated[idx]);
+          if (translated[idx] && translated[idx].trim()) {
+            map.set(m.id, translated[idx].trim());
+          } else {
+            map.set(m.id, m.text);
           }
+        });
+      } catch (fbErr: any) {
+        console.warn('Fallback error for missed chunk items:', fbErr.message);
+        missing.forEach((m) => {
+          if (!map.has(m.id)) map.set(m.id, m.text);
         });
       }
     }
