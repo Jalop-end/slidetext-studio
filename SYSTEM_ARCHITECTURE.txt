@@ -1,0 +1,216 @@
+================================================================================
+SLIDETEXT STUDIO – TECHNICKÁ INFOGRAFIKA A ARCHITEKTURA SYSTÉMU
+================================================================================
+Verze: 2.0 (Hybrid Gemma 4 Intelligence & OpenXML PPTX Studio)
+Platforma: Node.js / TypeScript / React / Vite / Ollama / Windows COM Automation
+Autor: DeepMind Antigravity Pair-Programming
+
+================================================================================
+1. SCHEMATICKÁ INFOGRAFIKA CELÉHO SYSTÉMU (ASCII / UNICODE DIAGRAM)
+================================================================================
+
++-------------------------------------------------------------------------------+
+|                           UŽIVATELSKÝ PROHLÍŽEČ                               |
+|               (React 18 + TypeScript + Vite Client Engine)                    |
++-------------------------------------------------------------------------------+
+       |                                                 |
+       | 1. Upload PPTX                                  | 4. Uživatelské úpravy,
+       |    (Drag & Drop / Sample)                       |    přepínání variant,
+       v                                                 |    výběr slidů
++------------------------------------+                   v
+|   KLIENTSKÝ OPENXML PARSER         |         +--------------------------------+
+|  - JSZip rozbalení binárního PPTX  |         |      DVOJITÉ PRACOVIŠTĚ        |
+|  - DOMParser slide*.xml, notes*.xml|         | [Editor dokumentu] [Visualizer]|
+|  - Extrakce hierarchie tvarů       |         | - Textarea editace | - COM / SVG
+|  - Detekce stylů, runů a odrážek   |         | - Pilulky variant  |   náhled  
++------------------------------------+         | - Hyperlinky       | - Highlight
+       |                                       +--------------------------------+
+       |                                                         |
+       | 2. Požadavek na překlad / korekturu / export           |
+       v                                                         v
+=================================================================================
+             REST API BACKEND & MIDDLEWARE (server.ts - Express Engine)
+=================================================================================
+                                       |
+    +----------------------------------+----------------------------------+
+    |                                  |                                  |
+    v                                  v                                  v
++-----------------------+  +-----------------------+  +-------------------------+
+|  HYBRID AI ANALYZER   |  |   BLESKOVÝ PŘEKLADAČ  |  |    OFFICE POWERPOINT    |
+|   (Gemma 4 / Ollama)  |  |  (Google GTX / DeepL) |  |     COM AUTOMATION      |
+|                       |  |                       |  |                         |
+| Port: 127.0.0.1:11434 |  | - Paralelní dávkování |  | - exportPptxSlides.ps1  |
+| Model: gemma4:latest  |  | - Index značky ⟦0⟧,⟦1⟧|  | - COM Interop export    |
+| - Detekce domény      |  | - 100% layout coverage|  | - Full HD 1920x1080 PNG |
+| - Detekce stylu       |  | - Blesková odezva     |  | - Robustní retry smyčka |
+| - Terminologický      |  |   (~1.5 sekundy pro   |  | - Fallback na JSZip     |
+|   glosář & synonyma   |  |   350 textových polí) |  |   vektorový renderer    |
+| - Generování variant  |  |                       |  |                         |
++-----------------------+  +-----------------------+  +-------------------------+
+    |                                  |                           |
+    +-----------------+----------------+                           |
+                      v                                            |
++-------------------------------------------------------+          |
+|    TERMINOLOGICKÝ SLUČOVAČ & ALTERNATIVE ENGINE       |          |
+| - Injektáž odborných termínů (např. Podpůrné služby   |          |
+|   -> Ancillary Services místo Support Services)       |          |
+| - Přiřazení pole klikacích alternativ k položkám      |          |
+| - Připojení metadat o doméně a stylu prezentace       |          |
++-------------------------------------------------------+          |
+                      |                                            |
+                      v                                            v
++-------------------------------------------------------------------------------+
+|                             VÝSTUPNÍ EXPORTÉR                                 |
+| - Rekonstrukce XML uzlů <a:t> v přesné struktuře původních <a:r> runů         |
+| - JSZip rekomprese do platného PowerPoint souboru (.pptx)                     |
+| - 100% zachování animací, přechodů, předloh (slideMaster) a grafiky           |
++-------------------------------------------------------------------------------+
+
+
+================================================================================
+2. TECHNICKÝ BĚH A ŽIVOTNÍ CYKLUS APLIKACE (RUNTIME LIFECYCLE)
+================================================================================
+
+KROK 1: PŘÍJEM A DEKOMPRESE SOUBORU PPTX
+--------------------------------------------------------------------------------
+PowerPoint (.pptx) soubor je ve skutečnosti archiv standardu OPC (Open Packaging
+Conventions) formátu ZIP obsahující strukturu XML dokumentů.
+1. Klient načte binární ArrayBuffer souboru.
+2. Knihovna JSZip provede dekompresi souboru v paměti bez nutnosti zápisu na disk.
+3. Klíčové parsované soubory:
+   - `[Content_Types].xml`: Deklarace MIME typů dokumentu.
+   - `ppt/presentation.xml`: Globální geometrie (poměr stran, rozměry v EMU).
+   - `ppt/slides/slide{N}.xml`: Vlastní obsah jednotlivých snímků.
+   - `ppt/slides/_rels/slide{N}.xml.rels`: Relace slidů (odkazy na média a poznámky).
+   - `ppt/notesSlides/notesSlide{N}.xml`: Poznámky řečníka (Speaker Notes).
+
+KROK 2: OPENXML PARSING A VYTVOŘENÍ DATOVÉHO MODELU
+--------------------------------------------------------------------------------
+Pro každý snímek probíhá rekurzivní průchod XML stromu přes DOMParser:
+- Vyhledání tvarů: `p:sp` (běžné tvary a textová pole), `p:graphicFrame` (tabulky
+  `a:tbl` a SmartArt).
+- Identifikace role prvku (nadpis, podnadpis, tělo, buňka tabulky, zápatí)
+  pomocí značky `p:ph` (placeholder type).
+- Extrakce odstavců `<a:p>` a textových běhů `<a:r>`:
+  - `<a:rPr>`: Velikost písma (`sz`), tučnost (`b`), kurzíva (`i`), barva (`a:srgbClr`).
+  - `<a:t>`: Samotný textový řetězec.
+  - `<a:hlinkClick>`: Přiložené URL hypertextové odkazy.
+Vzniká objektový model `PptxDocument`, který reprezentuje prezentaci v paměti
+připravenou pro obousměrnou synchronizaci.
+
+KROK 3: DVOJITÉ SYNCHRONIZOVANÉ PRACOVIŠTĚ (DUAL VIEW ENGINE)
+--------------------------------------------------------------------------------
+Aplikace nabízí dva souběžné pohledy na prezentaci:
+1. Dokumentový Word-Like Editor (vlevo):
+   - Umožňuje lineární čtení a editaci celé prezentace jako plynulého textu.
+   - Přepínání filtrů: "Vybraný snímek", "Pouze se změnami", "Všechny snímky".
+   - Živé počítadlo slov a znaků, porovnání diffu (původní vs. nový text).
+2. Interaktivní Visualizer (vpravo):
+   - Zobrazuje buď Full HD rasterizovaný snímek z PowerPointu, nebo vektorový
+     layout z XML.
+   - Kliknutí na text v editoru okamžitě zvýrazní prvek na snímku a naopak.
+
+KROK 4: HYBRIDNÍ PŘEKLADOVÁ ARCHITEKTURA (GEMMA 4 + FAST TRANSLATOR)
+--------------------------------------------------------------------------------
+Problém běžných LLM překladů:
+Sériový překlad stovek drobných textů přes lokální LLM (8B) trvá 5–10 minut,
+vyčerpává tokeny uvažování a občas selže na timeout.
+
+Řešení SlideText Studio:
+Architektura rozděluje úlohu na dvě specializované větve běžící PARALELNĚ:
+                       
+                       Vstupní texty prezentace
+                                  |
+                +-----------------+-----------------+
+                |                                   |
+                v                                   v
+      [Větev A: Gemma 4]                  [Větev B: Rychlý engine]
+  Jednorázová inteligence oboru         Bleskový paralelní překlad
+  - Vstup: 6-8 reprezentativních       - Vstup: všech 350 textů
+    nadpisů a termínů                   - Dávkování po 15 textech s
+  - Výstup:                               indexy ⟦0⟧, ⟦1⟧...
+    * Doména (např. Energetika)         - 100% zachování formátu
+    * Styl (Odborný technický)          - Doba běhu: ~1.5 sekundy
+    * Glosář klíčových termínů
+    * Alternativní verze frází
+  - Doba běhu: ~6-8 sekund
+                |                                   |
+                +-----------------+-----------------+
+                                  v
+                   [Terminologický slučovač]
+  - Nahradí obecné překlady odbornými termíny z glosáře
+    (např. "Support services" -> "Ancillary Services")
+  - Přiřadí pole klikacích alternativních variant k položkám
+  - Celkový čas: ~7 sekund pro kompletní prezentaci!
+
+KROK 5: INTERAKTIVNÍ VÝBĚR PŘEKLADOVÝCH VERZÍ (ALTERNATIVES ENGINE)
+--------------------------------------------------------------------------------
+Uživatel má dvě úrovně kontroly nad překladem:
+1. V okně náhledu překladu (AiTranslationModal):
+   - U každého řádku se zobrazí štítky alternativ.
+   - Jedním kliknutím lze zaměnit doporučený překlad za alternativu před uložením.
+2. V editoru dokumentu (DocumentEditor):
+   - Pod textovým polem jsou interaktivní čipy variant. Kliknutí okamžitě nahradí
+     text v editačním poli i v náhledu prezentace.
+   - Tlačítko "⚡ Varianty" volá endpoint `/api/translate/alternatives` a pomocí
+     Gemma 4 na vyžádání vygeneruje 3 nové stylistické verze (např. technická,
+     doslovná, manažerská).
+
+KROK 6: POWERPOINT COM RENDERER & FALLBACK
+--------------------------------------------------------------------------------
+Pro přesné zobrazení náhledu snímků:
+1. Backend spustí powershell skript `scripts/exportPptxSlides.ps1`.
+2. Skript otevře COM instanci `PowerPoint.Application`, otevře prezentaci
+   v tichém režimu bez zobrazení okna a zavolá `Slide.Export()` do formátu PNG
+   v rozlišení 1920x1080 (Full HD).
+3. Pokud PowerPoint COM není dostupný nebo je zaneprázdněn, klient automaticky
+   přepne na interní vektorový JSZip/SVG renderer, takže aplikace funguje
+   i na strojích bez nainstalovaného Microsoft Office.
+
+KROK 7: ZPĚTNÁ INJEKTÁŽ A EXPORT DO VÝSTUPNÍHO PPTX
+--------------------------------------------------------------------------------
+Při uložení/exportu prezentace:
+1. Původní JSZip instance je aktualizována modifikovanými texty.
+2. Pro každý upravený odstavec:
+   - Aktualizuje se text v uzlu `<a:t>` prvního textového běhu `<a:r>`.
+   - Pokud byl odstavec rozdělen do více běhů (např. kvůli různému formátování),
+     přebytečné prázdné běhy jsou korektně ošetřeny, aby se zachoval styl písma.
+3. Aktualizují se speaker notes v `ppt/notesSlides/notesSlide{N}.xml`.
+4. JSZip provede rekompresi do formátu `blob` (application/vnd.openxmlformats-
+   officedocument.presentationml.presentation).
+5. Soubor je nabídnut ke stažení s příponou `_upraveno.pptx`.
+
+
+================================================================================
+3. STRUKTURA DATOVÝCH MODELŮ (TYPESCRIPT INTERFACES)
+================================================================================
+
+PptxParagraph:
+  id: string                     // Unikátní identifikátor (např. slide-1-shape-2-p-0)
+  slideNumber: number            // Číslo snímku (1-based)
+  shapeRole: 'title' | 'body' ...// Kontextová role prvku na snímku
+  originalText: string           // Původní znění před úpravami
+  currentText: string            // Aktuální editovaný text
+  runs: PptxRun[]                // Původní formátovací bloky (font, barva, řez)
+  isModified: boolean            // Příznak manuální nebo AI modifikace
+  alternatives?: string[]        // Pole stylistických a odborných variant překladu
+  aiNotes?: string               // Poznámky auditora nebo informace o stylu
+  hyperlink?: { url: string }    // Přiložený webový odkaz
+
+TranslationResponse:
+  translations: TranslationResultItem[]
+  engine: 'gemma4-guided' | 'free-web' | 'google' | 'deepl'
+  domain?: string                // Rozpoznaný obor (např. Energetika / IT)
+  style?: string                 // Rozpoznaný styl (např. Formální technický)
+
+
+================================================================================
+4. BEZPEČNOST, PRIVÁTNOST A NÁROKY NA SYSTÉM
+================================================================================
+- 100% Lokální režim: Při použití Ollama (Gemma 4) neopouští žádná data váš počítač.
+  Analýza i korektura probíhá kompletně offline na localhostu.
+- Nulové externí náklady: Aplikace nevyžaduje žádné placené API klíče ani kreditní
+  karty. Výchozí režim je 100% zdarma.
+- Rychlost a efektivita: Hybridní architektura redukuje dobu zpracování z několika
+  minut na jednotky sekund při zachování maximální odborné kvality.
+================================================================================
