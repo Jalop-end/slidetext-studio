@@ -37,12 +37,22 @@ Profesionální webová aplikace pro editaci, bilingvní lokalizaci a vizualizac
 
 ## 🚀 Jak aplikaci spustit
 
-### Požadavky
+### ⚡ Nejjednodušší způsob: 1-Click Launcher (`start.bat`)
+
+Pro Windows stačí **dvakrát kliknout na `start.bat`** (nebo v terminálu spustit `./start.bat`):
+- **Při prvním spuštění:** Launcher automaticky detekuje systém, v případě potřeby stáhne/nainstaluje chybějící běhové prostředí (Node.js/Bun), nainstaluje všechny knihovny (`node_modules`), zkontroluje dostupnost PowerPointu a Ollamy, spustí server a automaticky otevře aplikaci v prohlížeči.
+- **Při každém dalším spuštění:** Okamžitě nastartuje server bez zdržování a otevře prohlížeč na **http://localhost:3000**.
+
+---
+
+### 💻 Manuální spuštění přes příkazovou řádku
+
+#### Požadavky
 - **Node.js** v20+ nebo **Bun** v1.2+
 - **Microsoft PowerPoint** (volitelné – pro generování Full HD náhledů z PowerPoint COM na Windows)
 - **Ollama** (volitelné – pouze pokud chcete využívat lokální model Gemma 4)
 
-### Instalace závislostí
+#### Instalace závislostí
 ```bash
 git clone https://github.com/Jalop-end/slidetext-studio.git
 cd slidetext-studio
@@ -51,7 +61,7 @@ npm install
 bun install
 ```
 
-### Spuštění lokálního serveru
+#### Spuštění lokálního serveru
 ```bash
 npm run dev
 # nebo pomocí Bun:
