@@ -172,6 +172,10 @@ if ($isFirstRun) {
         & $bunCmd install
     } else {
         & $npmCmd install
+        if ($LASTEXITCODE -ne 0) {
+            Write-Color "   [!] Zkousim instalaci s --legacy-peer-deps..." ([ConsoleColor]::Yellow)
+            & $npmCmd install --legacy-peer-deps
+        }
     }
 
     if ($LASTEXITCODE -ne 0) {
