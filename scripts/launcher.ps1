@@ -189,6 +189,18 @@ if ($isFirstRun) {
 }
 
 # ---------------------------------------------------------------------------
+# 4b. ZASTUPCE NA PLOSE (DESKTOP SHORTCUT)
+# ---------------------------------------------------------------------------
+$desktopDir = [System.Environment]::GetFolderPath([System.Environment+SpecialFolder]::Desktop)
+$shortcutFile = Join-Path $desktopDir "SlideText Studio.lnk"
+if (-not (Test-Path $shortcutFile)) {
+    try {
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$PSScriptRoot\create_desktop_shortcut.ps1" | Out-Null
+        Write-Color "   [OK] Vytvoren zastupce na plose: SlideText Studio.lnk" ([ConsoleColor]::Green)
+    } catch {}
+}
+
+# ---------------------------------------------------------------------------
 # 5. KONTROLA VOLITELNYCH NASTROJU
 # ---------------------------------------------------------------------------
 $hasPowerPoint = $false

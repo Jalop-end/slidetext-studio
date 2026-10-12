@@ -14,9 +14,10 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\launcher.ps1" %*
+set "EXIT_CODE=%ERRORLEVEL%"
 
-if %ERRORLEVEL% NEQ 0 (
+if %EXIT_CODE% NEQ 0 (
     echo.
-    echo [CHYBA] Aplikace se ukoncila s chybou (kod: %ERRORLEVEL%).
+    echo [CHYBA] Aplikace se ukoncila s chybou [kod: %EXIT_CODE%].
     pause
 )
