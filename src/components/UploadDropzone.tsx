@@ -249,7 +249,7 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({
             >
               <div>
                 <div className="flex items-center gap-1.5 font-bold text-xs text-blue-900 group-hover:text-blue-700">
-                  <span>📄 Výroční zpráva & Plán (.docx)</span>
+                  <span>Výroční zpráva & Plán (.docx)</span>
                 </div>
                 <p className="text-[11px] text-slate-500 mt-1">
                   Word dokument: nadpisy, formátované odstavce, odrážky a strukturovaná tabulka

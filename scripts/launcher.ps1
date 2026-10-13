@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     SlideText Studio - Inteligentni Launcher a Inicializator
 .DESCRIPTION
@@ -27,7 +27,7 @@ function Write-Color([string]$text, [ConsoleColor]$color = [ConsoleColor]::White
 function Write-Banner {
     Clear-Host
     Write-Color "=================================================================" ([ConsoleColor]::Cyan)
-    Write-Color "               🚀 SlideText Studio Launcher                     " ([ConsoleColor]::Yellow)
+    Write-Color "                  SlideText Studio Launcher                      " ([ConsoleColor]::Yellow)
     Write-Color "  PowerPoint & Word Editor & AI Translator (100% Zachovani stylu)" ([ConsoleColor]::White)
     Write-Color "=================================================================" ([ConsoleColor]::Cyan)
     Write-Host ""
@@ -83,10 +83,10 @@ $readyMarker = Test-Path "$RootPath\.launcher-ready"
 $isFirstRun = (-not $modulesExist) -or (-not $readyMarker) -or $Reinstall
 
 if ($isFirstRun) {
-    Write-Color "🛠️  PRVNI SPUSTENI: Inicializace a kontrola potrebnych nastroju..." ([ConsoleColor]::Magenta)
+    Write-Color "[*] PRVNI SPUSTENI: Inicializace a kontrola potrebnych nastroju..." ([ConsoleColor]::Magenta)
     Write-Color "-----------------------------------------------------------------" ([ConsoleColor]::DarkGray)
 } else {
-    Write-Color "⚡ RYCHLY START: Vsechny nastroje a zavislosti jsou pripraveny." ([ConsoleColor]::Green)
+    Write-Color "[OK] RYCHLY START: Vsechny nastroje a zavislosti jsou pripraveny." ([ConsoleColor]::Green)
     Write-Color "-----------------------------------------------------------------" ([ConsoleColor]::DarkGray)
 }
 
@@ -166,7 +166,7 @@ if (-not (Test-Path "$RootPath\.env") -and (Test-Path "$RootPath\.env.example"))
 # ---------------------------------------------------------------------------
 if ($isFirstRun) {
     Write-Host ""
-    Write-Color "📦 Instaluji projektove knihovny a zavislosti..." ([ConsoleColor]::Cyan)
+    Write-Color "[..] Instaluji projektove knihovny a zavislosti..." ([ConsoleColor]::Cyan)
 
     if ($bunCmd) {
         & $bunCmd install
@@ -215,9 +215,25 @@ try {
 }
 
 if ($hasPowerPoint) {
-    Write-Color "   [OK] Microsoft PowerPoint: Detekovan (Full HD 1080p nativni export snimku aktivni)" ([ConsoleColor]::Green)
+    Write-Color "   [OK] Microsoft PowerPoint: Detekovan (Full HD nativni export snimku aktivni)" ([ConsoleColor]::Green)
 } else {
     Write-Color "   [i]  Microsoft PowerPoint: Neni detekovan (pouzije se webovy generator nahledu)" ([ConsoleColor]::DarkGray)
+}
+
+$hasWord = $false
+try {
+    $w = New-Object -ComObject Word.Application -ErrorAction Stop
+    $w.Quit()
+    [System.Runtime.InteropServices.Marshal]::ReleaseComObject($w) | Out-Null
+    $hasWord = $true
+} catch {
+    $hasWord = $false
+}
+
+if ($hasWord) {
+    Write-Color "   [OK] Microsoft Word: Detekovan (Full HD nativni export stranek aktivni)" ([ConsoleColor]::Green)
+} else {
+    Write-Color "   [i]  Microsoft Word: Neni detekovan" ([ConsoleColor]::DarkGray)
 }
 
 $hasOllama = $false
@@ -244,11 +260,11 @@ $alreadyRunning = Test-PortOpen "127.0.0.1" $Port
 
 if ($alreadyRunning) {
     Write-Color "=================================================================" ([ConsoleColor]::Green)
-    Write-Color "✨ SlideText Studio jiz bezi na adrese: $appUrl" ([ConsoleColor]::Green)
+    Write-Color "[OK] SlideText Studio jiz bezi na adrese: $appUrl" ([ConsoleColor]::Green)
     Write-Color "=================================================================" ([ConsoleColor]::Green)
     Write-Host ""
     if (-not $NoBrowser) {
-        Write-Color "🌐 Oteviram aplikaci ve vychozim prohlizeci..." ([ConsoleColor]::Cyan)
+        Write-Color "[>>] Oteviram aplikaci ve vychozim prohlizeci..." ([ConsoleColor]::Cyan)
         Start-Process $appUrl
     }
     Write-Color "Stisknete Enter pro zavreni tohoto okna." ([ConsoleColor]::DarkGray)
@@ -257,9 +273,9 @@ if ($alreadyRunning) {
 }
 
 Write-Color "=================================================================" ([ConsoleColor]::Cyan)
-Write-Color "🌐 Spoustim SlideText Studio server na $appUrl" ([ConsoleColor]::Yellow)
-Write-Color "👉 Prohlizec se automaticky otevre po nabehnuti serveru." ([ConsoleColor]::Cyan)
-Write-Color "🛑 Pro ukonceni stisknete kdykoliv Ctrl+C" ([ConsoleColor]::DarkGray)
+Write-Color "[>>] Spoustim SlideText Studio server na $appUrl" ([ConsoleColor]::Yellow)
+Write-Color "     Prohlizec se automaticky otevre po nabehnuti serveru." ([ConsoleColor]::Cyan)
+Write-Color "     Pro ukonceni stisknete kdykoliv Ctrl+C" ([ConsoleColor]::DarkGray)
 Write-Color "=================================================================" ([ConsoleColor]::Cyan)
 Write-Host ""
 
