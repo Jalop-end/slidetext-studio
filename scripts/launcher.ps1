@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     SlideText Studio - Inteligentni Launcher a Inicializator
 .DESCRIPTION
@@ -184,7 +184,8 @@ if ($isFirstRun) {
         exit 1
     }
 
-    Set-Content -Path "$RootPath\.launcher-ready" -Value "Initialized at $(Get-Date -Format 'o')" -Encoding UTF8
+    $initTimestamp = (Get-Date).ToString("o")
+    Set-Content -Path "$RootPath\.launcher-ready" -Value "Initialized at $initTimestamp" -Encoding UTF8
     Write-Color "   [OK] Vsechny knihovny byly uspesne nainstalovany." ([ConsoleColor]::Green)
 }
 
