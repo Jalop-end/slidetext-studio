@@ -50,6 +50,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
   onUpdateParagraphHyperlink,
 }) => {
   const { t } = useLanguage();
+  const isWord = document.docType === 'docx';
   // View mode: 'single' (only current slide), 'modified' (only slides with changes), 'all' (all slides)
   const [viewFilter, setViewFilter] = useState<'single' | 'modified' | 'all'>('single');
   const [collapsedSlides, setCollapsedSlides] = useState<Record<number, boolean>>({});
@@ -155,10 +156,10 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                     ? 'bg-white text-blue-700 shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
-                title={t('singleSlideViewTooltip', 'Zobrazit pouze jeden vybraný snímek bez nutnosti skrolování')}
+                title={isWord ? 'Zobrazit pouze jednu vybranou stránku bez nutnosti skrolování' : t('singleSlideViewTooltip', 'Zobrazit pouze jeden vybraný snímek bez nutnosti skrolování')}
               >
                 <Eye className="w-3.5 h-3.5" />
-                <span>{t('singleSlideView', 'Vybraný snímek')}</span>
+                <span>{isWord ? 'Vybraná stránka' : t('singleSlideView', 'Vybraný snímek')}</span>
               </button>
 
               <button
@@ -169,7 +170,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                     ? 'bg-white text-amber-700 shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
-                title={t('onlyModifiedTooltip', 'Zobrazit pouze snímky, na kterých byly provedeny změny')}
+                title={isWord ? 'Zobrazit pouze stránky, na kterých byly provedeny změny' : t('onlyModifiedTooltip', 'Zobrazit pouze snímky, na kterých byly provedeny změny')}
               >
                 <Sparkles className="w-3.5 h-3.5 text-amber-500" />
                 <span>{t('onlyModifiedSlides', 'Pouze se změnami')}</span>
@@ -188,10 +189,10 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                     ? 'bg-white text-slate-900 shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
-                title={t('allSlidesTooltip', 'Zobrazit celou prezentaci jako souvislý dokument')}
+                title={isWord ? 'Zobrazit celý Word dokument jako souvislý text' : t('allSlidesTooltip', 'Zobrazit celou prezentaci jako souvislý dokument')}
               >
                 <Layers className="w-3.5 h-3.5" />
-                <span>{t('allSlidesView', 'Všechny snímky')}</span>
+                <span>{isWord ? 'Všechny stránky' : t('allSlidesView', 'Všechny snímky')}</span>
               </button>
             </div>
 
@@ -202,7 +203,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                 onClick={handlePrevSlide}
                 disabled={currentSlideNumber <= 1}
                 className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none transition-colors"
-                title="Předchozí snímek"
+                title={isWord ? 'Předchozí stránka' : 'Předchozí snímek'}
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
@@ -221,9 +222,10 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                     (acc, sh) => acc + sh.paragraphs.filter((p) => p.isModified).length,
                     0
                   );
+                  const fallback = isWord ? `Stránka ${s.slideNumber}` : `Snímek ${s.slideNumber}`;
                   return (
                     <option key={`opt-slide-${s.slideNumber}`} value={s.slideNumber}>
-                      {`#${s.slideNumber}: ${s.title || 'Snímek ' + s.slideNumber}${
+                      {`#${s.slideNumber}: ${s.title || fallback}${
                         modCount > 0 ? ` (${modCount} změn)` : ''
                       }`}
                     </option>
@@ -236,7 +238,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                 onClick={handleNextSlide}
                 disabled={currentSlideNumber >= document.slides.length}
                 className="p-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none transition-colors"
-                title="Další snímek"
+                title={isWord ? 'Další stránka' : 'Další snímek'}
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -363,7 +365,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
 
                   <div className="min-w-0">
                     <h3 className="font-bold text-slate-900 text-sm truncate flex items-center gap-2">
-                      {slide.title || `${t('slide', 'Snímek')} ${slide.slideNumber}`}
+                      {slide.title || `${isWord ? 'Stránka' : t('slide', 'Snímek')} ${slide.slideNumber}`}
                       {isCurrent && (
                         <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 border border-blue-200/60">
                           {t('activePreview', 'Aktivní náhled')}
@@ -881,30 +883,32 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                     ))
                   )}
 
-                  {/* Speaker Notes */}
-                  <div className="mt-6 pt-4 border-t border-slate-200">
-                    <div className="flex items-center justify-between text-xs font-semibold text-slate-700 mb-2">
-                      <span className="flex items-center gap-1.5">
-                        <FileText className="w-3.5 h-3.5 text-slate-400" />
-                        {t('speakerNotes', 'Poznámka pro řečníka')}
-                      </span>
-                      {slide.speakerNotes?.isModified && (
-                        <span className="text-[10px] text-amber-700 font-semibold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
-                          {t('notesModified', 'Poznámka upravena')}
+                  {/* Speaker Notes (Presentations only) */}
+                  {!isWord && (
+                    <div className="mt-6 pt-4 border-t border-slate-200">
+                      <div className="flex items-center justify-between text-xs font-semibold text-slate-700 mb-2">
+                        <span className="flex items-center gap-1.5">
+                          <FileText className="w-3.5 h-3.5 text-slate-400" />
+                          {t('speakerNotes', 'Poznámka pro řečníka')}
                         </span>
-                      )}
+                        {slide.speakerNotes?.isModified && (
+                          <span className="text-[10px] text-amber-700 font-semibold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                            {t('notesModified', 'Poznámka upravena')}
+                          </span>
+                        )}
+                      </div>
+                      <textarea
+                        value={slide.speakerNotes?.text || ''}
+                        onChange={(e) => onUpdateSpeakerNotes(slide.slideNumber, e.target.value)}
+                        placeholder={t(
+                          'speakerNotesPlaceholder',
+                          'Poznámky k tomuto snímku pro přednášejícího...'
+                        )}
+                        rows={2}
+                        className="w-full text-xs p-2.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-colors"
+                      />
                     </div>
-                    <textarea
-                      value={slide.speakerNotes?.text || ''}
-                      onChange={(e) => onUpdateSpeakerNotes(slide.slideNumber, e.target.value)}
-                      placeholder={t(
-                        'speakerNotesPlaceholder',
-                        'Poznámky k tomuto snímku pro přednášejícího...'
-                      )}
-                      rows={2}
-                      className="w-full text-xs p-2.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-colors"
-                    />
-                  </div>
+                  )}
                 </div>
               )}
             </div>

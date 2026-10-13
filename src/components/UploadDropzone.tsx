@@ -18,7 +18,7 @@ import { useLanguage } from '../context/LanguageContext';
 
 interface UploadDropzoneProps {
   onFileUpload: (file: File) => void;
-  onLoadSample: (sampleType: 'czech-strategy' | 'english-pitch') => void;
+  onLoadSample: (sampleType: 'czech-strategy' | 'english-pitch' | 'word-strategy') => void;
   isLoading: boolean;
   loadingMessage?: string;
 }
@@ -50,8 +50,11 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({
     e.preventDefault();
     setIsDragOver(false);
     const files = e.dataTransfer.files;
-    if (files.length > 0 && files[0].name.toLowerCase().endsWith('.pptx')) {
-      onFileUpload(files[0]);
+    if (files.length > 0) {
+      const name = files[0].name.toLowerCase();
+      if (name.endsWith('.pptx') || name.endsWith('.docx')) {
+        onFileUpload(files[0]);
+      }
     }
   };
 
@@ -144,7 +147,7 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({
             type="file"
             ref={fileInputRef}
             onChange={handleFileChange}
-            accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+            accept=".pptx,.docx,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             className="hidden"
           />
 
@@ -154,31 +157,36 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({
                 <Loader2 className="w-8 h-8 animate-spin" />
               </div>
               <p className="font-bold text-slate-900 text-base">
-                {loadingMessage || t('loadingPresentation', 'Zpracovávám prezentaci...')}
+                {loadingMessage || t('loadingPresentation', 'Zpracovávám dokument...')}
               </p>
               <p className="text-xs text-slate-500">
-                {t('loadingPresentation', 'Rozbaluji snímky a načítám textové bloky...')}
+                {t('loadingPresentationDesc', 'Rozbaluji strukturu a načítám textové bloky se 100% zachováním stylů...')}
               </p>
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-orange-500 to-amber-500 text-white flex items-center justify-center mx-auto shadow-lg shadow-orange-500/25">
-                <UploadCloud className="w-8 h-8" />
+              <div className="flex items-center justify-center gap-3">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-orange-500 to-amber-500 text-white flex items-center justify-center shadow-lg shadow-orange-500/25" title="PowerPoint (.pptx)">
+                  <UploadCloud className="w-7 h-7" />
+                </div>
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-blue-500/25" title="Microsoft Word (.docx)">
+                  <FileText className="w-7 h-7" />
+                </div>
               </div>
 
               <div>
                 <p className="font-bold text-slate-900 text-base sm:text-lg">
-                  {t('dragDropOrClick', 'Přetáhněte sem soubor .pptx nebo klikněte')}
+                  {t('dragDropOrClick', 'Přetáhněte sem prezentaci (.pptx) nebo dokument Word (.docx)')}
                 </p>
                 <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                  {t('supportedFormatsDesc', 'Podporovány jsou všechny verze Microsoft PowerPoint, Google Prezentace a LibreOffice')}
+                  {t('supportedFormatsDesc', 'Podporovány jsou soubory Microsoft PowerPoint (.pptx) i Microsoft Word (.docx)')}
                 </p>
               </div>
 
-              <div className="pt-2">
-                <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs shadow-md shadow-orange-600/20 transition-all">
+              <div className="pt-2 flex items-center justify-center gap-2">
+                <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-md transition-all">
                   <FileText className="w-4 h-4" />
-                  {t('chooseFromComputer', 'Vybrat soubor z počítače')}
+                  {t('chooseFromComputer', 'Vybrat soubor z počítače (.pptx / .docx)')}
                 </span>
               </div>
             </div>
@@ -190,15 +198,15 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({
           <div className="flex items-center justify-between">
             <div>
               <h3 className="font-bold text-slate-900 text-sm">
-                {t('noFileOnHand', 'Nemáte zrovna po ruce .pptx soubor?')}
+                {t('noFileOnHand', 'Nemáte zrovna po ruce svůj soubor?')}
               </h3>
               <p className="text-xs text-slate-500">
-                {t('trySampleDesc', 'Vyzkoušejte aplikaci okamžitě s jednou z našich připravených vzorových prezentací:')}
+                {t('trySampleDesc', 'Vyzkoušejte aplikaci okamžitě s jednou z našich připravených vzorových ukázek:')}
               </p>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <button
               type="button"
               onClick={() => onLoadSample('czech-strategy')}
@@ -207,10 +215,10 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({
             >
               <div>
                 <div className="flex items-center gap-1.5 font-bold text-xs text-slate-900 group-hover:text-orange-700">
-                  <span>{t('sampleCzech', '🇨🇿 Firemní strategie inovací')}</span>
+                  <span>{t('sampleCzech', '🇨🇿 Prezentace: Strategie inovací (.pptx)')}</span>
                 </div>
                 <p className="text-[11px] text-slate-500 mt-1">
-                  {t('sampleCzechDesc', '4 snímky, odrážky, podnadpisy, vhodné pro překlad do AJ/NJ a zhuštění textů')}
+                  {t('sampleCzechDesc', '4 snímky, odrážky, podnadpisy, vhodné pro překlad do AJ/NJ')}
                 </p>
               </div>
               <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-orange-600 shrink-0 mt-0.5 transition-transform group-hover:translate-x-0.5" />
@@ -224,13 +232,30 @@ export const UploadDropzone: React.FC<UploadDropzoneProps> = ({
             >
               <div>
                 <div className="flex items-center gap-1.5 font-bold text-xs text-slate-900 group-hover:text-orange-700">
-                  <span>{t('sampleEnglish', '🇬🇧 Global Tech Pitch 2026')}</span>
+                  <span>{t('sampleEnglish', '🇬🇧 Pitch Deck 2026 (.pptx)')}</span>
                 </div>
                 <p className="text-[11px] text-slate-500 mt-1">
-                  {t('sampleEnglishDesc', 'Anglický pitch deck, perfektní pro test lokalizace do češtiny s kontextovým auditem')}
+                  {t('sampleEnglishDesc', 'Anglický pitch deck, perfektní pro test lokalizace do češtiny')}
                 </p>
               </div>
               <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-orange-600 shrink-0 mt-0.5 transition-transform group-hover:translate-x-0.5" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onLoadSample('word-strategy')}
+              disabled={isLoading}
+              className="p-3.5 rounded-xl border border-blue-200 hover:border-blue-400 hover:bg-blue-50/50 text-left transition-all flex items-start justify-between group disabled:opacity-50"
+            >
+              <div>
+                <div className="flex items-center gap-1.5 font-bold text-xs text-blue-900 group-hover:text-blue-700">
+                  <span>📄 Výroční zpráva & Plán (.docx)</span>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Word dokument: nadpisy, formátované odstavce, odrážky a strukturovaná tabulka
+                </p>
+              </div>
+              <ArrowRight className="w-4 h-4 text-blue-400 group-hover:text-blue-600 shrink-0 mt-0.5 transition-transform group-hover:translate-x-0.5" />
             </button>
           </div>
         </div>

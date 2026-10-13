@@ -6,7 +6,9 @@
 import React, { useState } from 'react';
 import { PptxDocument, PptxParagraph } from './types/pptx';
 import { parsePptxFile, updatePptxAndExport, renderPptxSlidesViaBackend } from './services/pptxParser';
+import { parseDocxFile, updateDocxAndExport, renderDocxPagesViaBackend } from './services/docxParser';
 import { generateSamplePptx } from './services/samplePptxGenerator';
+import { generateSampleDocx } from './services/sampleDocxGenerator';
 import { Header } from './components/Header';
 import { DocumentEditor } from './components/DocumentEditor';
 import { SlideVisualizer } from './components/SlideVisualizer';
@@ -90,9 +92,54 @@ export default function App() {
   // Upload handlers
   const handleFileUpload = async (file: File) => {
     setIsLoading(true);
-    setLoadingMessage(`${t('loadingPresentation', 'Načítám prezentaci...')} (${file.name})`);
+    const isWord = file.name.toLowerCase().endsWith('.docx');
+    setLoadingMessage(
+      isWord
+        ? `Načítám Word dokument... (${file.name})`
+        : `${t('loadingPresentation', 'Načítám prezentaci...')} (${file.name})`
+    );
+
     try {
       const arrayBuf = await file.arrayBuffer();
+
+      if (isWord) {
+        const parsed = await parseDocxFile(arrayBuf, file.name);
+        parsed.originalBuffer = arrayBuf;
+        setDocument(parsed);
+        setHistory([parsed]);
+        setHistoryIndex(0);
+        setCurrentSlideNumber(1);
+        setSelectedParagraphId(null);
+        setIsLoading(false);
+        showToast(`Dokument Word načten: ${parsed.slides.length} stránek. Načítám věrný náhled...`);
+
+        // Asynchronously render Word page previews via backend
+        setIsRenderingPptx(true);
+        try {
+          const res = await renderDocxPagesViaBackend(arrayBuf);
+          if (res.success && res.pageImages.length > 0) {
+            setDocument((prev) => {
+              if (!prev) return null;
+              const updatedSlides = prev.slides.map((s, idx) => ({
+                ...s,
+                renderedImageDataUrl: res.pageImages[idx] || s.renderedImageDataUrl,
+                originalRenderedImageDataUrl: res.pageImages[idx] || s.originalRenderedImageDataUrl,
+              }));
+              const updatedDoc = { ...prev, slides: updatedSlides };
+              setHistory([updatedDoc]);
+              return updatedDoc;
+            });
+            showToast(`Word náhled připraven (${res.pageImages.length} stránek).`);
+          }
+        } catch (renderErr) {
+          console.warn('Word background render error:', renderErr);
+        } finally {
+          setIsRenderingPptx(false);
+        }
+        return;
+      }
+
+      // PPTX parsing
       const parsed = await parsePptxFile(arrayBuf, file.name);
       parsed.originalBuffer = arrayBuf;
       setDocument(parsed);
@@ -127,15 +174,63 @@ export default function App() {
         setIsRenderingPptx(false);
       }
     } catch (error: any) {
-      console.error('Chyba při zpracování PPTX:', error);
-      alert('Nepodařilo se načíst soubor PPTX. Ujistěte se, že jde o platnou PowerPoint prezentaci.');
+      console.error('Chyba při zpracování souboru:', error);
+      alert('Nepodařilo se načíst soubor: ' + (error.message || 'Ujistěte se, že jde o platný soubor PPTX nebo DOCX.'));
       setIsLoading(false);
       setLoadingMessage('');
     }
   };
 
-  const handleLoadSample = async (sampleType: 'czech-strategy' | 'english-pitch') => {
+  const handleLoadSample = async (sampleType: 'czech-strategy' | 'english-pitch' | 'word-strategy') => {
     setIsLoading(true);
+
+    if (sampleType === 'word-strategy') {
+      setLoadingMessage('Generuji vzorový Word dokument...');
+      try {
+        const sampleBlob = await generateSampleDocx();
+        const arrayBuf = await sampleBlob.arrayBuffer();
+        const fileName = 'Vyrocni_zprava_2026.docx';
+        const parsed = await parseDocxFile(arrayBuf, fileName);
+        parsed.originalBuffer = arrayBuf;
+        setDocument(parsed);
+        setHistory([parsed]);
+        setHistoryIndex(0);
+        setCurrentSlideNumber(1);
+        setSelectedParagraphId(null);
+        setIsLoading(false);
+        showToast(`Vzorový Word dokument načten (${parsed.slides.length} stránek).`);
+
+        setIsRenderingPptx(true);
+        try {
+          const res = await renderDocxPagesViaBackend(arrayBuf);
+          if (res.success && res.pageImages.length > 0) {
+            setDocument((prev) => {
+              if (!prev) return null;
+              const updatedSlides = prev.slides.map((s, idx) => ({
+                ...s,
+                renderedImageDataUrl: res.pageImages[idx] || s.renderedImageDataUrl,
+                originalRenderedImageDataUrl: res.pageImages[idx] || s.originalRenderedImageDataUrl,
+              }));
+              const updatedDoc = { ...prev, slides: updatedSlides };
+              setHistory([updatedDoc]);
+              return updatedDoc;
+            });
+            showToast(`Věrný Word náhled připraven (${res.pageImages.length} stránek).`);
+          }
+        } catch (renderErr) {
+          console.warn('Word sample background render error:', renderErr);
+        } finally {
+          setIsRenderingPptx(false);
+        }
+      } catch (err: any) {
+        console.error('Chyba při vzoru Word:', err);
+        alert('Nepodařilo se vygenerovat vzorový Word dokument.');
+        setIsLoading(false);
+        setLoadingMessage('');
+      }
+      return;
+    }
+
     setLoadingMessage(t('loadingPresentation', 'Načítám vzorovou prezentaci...'));
     try {
       const sample = await generateSamplePptx(sampleType);
@@ -181,30 +276,54 @@ export default function App() {
     }
   };
 
-  // Re-render modified presentation via PowerPoint backend
+  // Re-render modified presentation or document via backend
   const handleRefreshRender = async () => {
     if (!document) return;
+    const isWord = document.docType === 'docx';
     setIsRenderingPptx(true);
-    showToast(t('reRenderStarted', 'Generuji aktuální PowerPoint náhled se všemi provedenými změnami...'));
+    showToast(
+      isWord
+        ? 'Generuji aktuální Word náhled se všemi provedenými změnami...'
+        : t('reRenderStarted', 'Generuji aktuální PowerPoint náhled se všemi provedenými změnami...')
+    );
+
     try {
-      const updatedBlob = await updatePptxAndExport(document.rawZip, document.slides);
-      const renderedImages = await renderPptxSlidesViaBackend(updatedBlob);
-      if (renderedImages.length > 0) {
-        setDocument((prev) => {
-          if (!prev) return null;
-          const updatedSlides = prev.slides.map((s, idx) => ({
-            ...s,
-            renderedImageDataUrl: renderedImages[idx] || s.renderedImageDataUrl,
-          }));
-          return { ...prev, slides: updatedSlides };
-        });
-        showToast(t('reRenderSuccess', 'PowerPoint náhled byl úspěšně zaktualizován.'));
+      if (isWord) {
+        const updatedBlob = await updateDocxAndExport(document.rawZip, document);
+        const res = await renderDocxPagesViaBackend(updatedBlob);
+        if (res.success && res.pageImages.length > 0) {
+          setDocument((prev) => {
+            if (!prev) return null;
+            const updatedSlides = prev.slides.map((s, idx) => ({
+              ...s,
+              renderedImageDataUrl: res.pageImages[idx] || s.renderedImageDataUrl,
+            }));
+            return { ...prev, slides: updatedSlides };
+          });
+          showToast('Word náhled byl úspěšně zaktualizován.');
+        } else {
+          showToast('Používá se interaktivní náhled dokumentu.');
+        }
       } else {
-        showToast('Náhled je aktuální.');
+        const updatedBlob = await updatePptxAndExport(document.rawZip, document.slides);
+        const renderedImages = await renderPptxSlidesViaBackend(updatedBlob);
+        if (renderedImages.length > 0) {
+          setDocument((prev) => {
+            if (!prev) return null;
+            const updatedSlides = prev.slides.map((s, idx) => ({
+              ...s,
+              renderedImageDataUrl: renderedImages[idx] || s.renderedImageDataUrl,
+            }));
+            return { ...prev, slides: updatedSlides };
+          });
+          showToast(t('reRenderSuccess', 'PowerPoint náhled byl úspěšně zaktualizován.'));
+        } else {
+          showToast('Náhled je aktuální.');
+        }
       }
     } catch (err: any) {
       console.warn('Re-render error:', err);
-      showToast('Aktualizace PowerPoint náhledu se nezdařila, používá se interaktivní náhled.');
+      showToast('Aktualizace náhledu se nezdařila, používá se interaktivní zobrazení.');
     } finally {
       setIsRenderingPptx(false);
     }
@@ -292,21 +411,25 @@ export default function App() {
     }
   };
 
-  // Export to .pptx preserving original visual layout & format
-  const handleExportPptx = async (customFileName?: string) => {
+  // Export to .pptx or .docx preserving original visual layout & format
+  const handleExportDocument = async (customFileName?: string) => {
     if (!document) return;
     setIsExporting(true);
+    const isWord = document.docType === 'docx';
+    const ext = isWord ? '.docx' : '.pptx';
 
     try {
-      const outputBlob = await updatePptxAndExport(document.rawZip, document.slides);
+      const outputBlob = isWord
+        ? await updateDocxAndExport(document.rawZip, document)
+        : await updatePptxAndExport(document.rawZip, document.slides);
 
       // Determine final download file name
       let downloadName = customFileName?.trim();
       if (!downloadName) {
-        const originalName = document.fileName.replace(/\.pptx$/i, '');
-        downloadName = `${originalName}_upraveno.pptx`;
-      } else if (!downloadName.toLowerCase().endsWith('.pptx')) {
-        downloadName += '.pptx';
+        const originalName = document.fileName.replace(/\.(pptx|docx)$/i, '');
+        downloadName = `${originalName}_upraveno${ext}`;
+      } else if (!downloadName.toLowerCase().endsWith(ext)) {
+        downloadName += ext;
       }
 
       const downloadUrl = URL.createObjectURL(outputBlob);
@@ -318,10 +441,10 @@ export default function App() {
       window.document.body.removeChild(a);
       URL.revokeObjectURL(downloadUrl);
 
-      showToast(`Prezentace úspěšně uložena jako ${downloadName}`);
+      showToast(`${isWord ? 'Dokument Word' : 'Prezentace'} úspěšně uložena jako ${downloadName}`);
     } catch (err: any) {
       console.error('Chyba při exportu:', err);
-      alert('Nepodařilo se vyexportovat prezentaci: ' + (err.message || 'Neznámá chyba'));
+      alert('Nepodařilo se vyexportovat soubor: ' + (err.message || 'Neznámá chyba'));
     } finally {
       setIsExporting(false);
     }
@@ -329,16 +452,17 @@ export default function App() {
 
   const handleRenameDocument = (newName: string) => {
     if (!document || !newName.trim()) return;
-    let clean = newName.trim();
-    if (!clean.toLowerCase().endsWith('.pptx')) {
-      clean += '.pptx';
-    }
+    const isWord = document.docType === 'docx';
+    const ext = isWord ? '.docx' : '.pptx';
+    let clean = newName.trim().replace(/\.(pptx|docx)$/i, '');
+    const finalName = `${clean}${ext}`;
+
     const updated = {
       ...document,
-      fileName: clean,
+      fileName: finalName,
     };
     commitDocumentChange(updated);
-    showToast(`Prezentace přejmenována na: ${clean}`);
+    showToast(`Dokument přejmenován na: ${finalName}`);
   };
 
   // AI batch applications
@@ -666,6 +790,7 @@ export default function App() {
             }`}
           >
             <SlideVisualizer
+              docType={document.docType}
               slides={document.slides}
               currentSlideNumber={currentSlideNumber}
               onSlideChange={setCurrentSlideNumber}
@@ -737,7 +862,7 @@ export default function App() {
         isOpen={isPreSaveOpen}
         onClose={() => setIsPreSaveOpen(false)}
         document={document}
-        onConfirmExport={handleExportPptx}
+        onConfirmExport={handleExportDocument}
         isExporting={isExporting}
       />
     </div>

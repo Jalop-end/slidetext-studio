@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     SlideText Studio - Inteligentni Launcher a Inicializator
 .DESCRIPTION
@@ -28,7 +28,7 @@ function Write-Banner {
     Clear-Host
     Write-Color "=================================================================" ([ConsoleColor]::Cyan)
     Write-Color "               🚀 SlideText Studio Launcher                     " ([ConsoleColor]::Yellow)
-    Write-Color "     PowerPoint Editor & AI Translator (100% Zachovani rozvrzeni)" ([ConsoleColor]::White)
+    Write-Color "  PowerPoint & Word Editor & AI Translator (100% Zachovani stylu)" ([ConsoleColor]::White)
     Write-Color "=================================================================" ([ConsoleColor]::Cyan)
     Write-Host ""
 }

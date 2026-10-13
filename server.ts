@@ -1013,6 +1013,88 @@ app.post('/api/pptx/render', async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// 4b. DOCX High-Fidelity Page Render Endpoint (Word COM)
+// ---------------------------------------------------------------------------
+app.post('/api/docx/render', async (req, res) => {
+  const releaseLock = await acquireRenderLock();
+  try {
+    const { docxBase64, width = 1600, height = 2260 } = req.body;
+    if (!docxBase64) {
+      return res.status(400).json({ error: 'Nebyla poskytnuta data dokumentu (docxBase64).' });
+    }
+
+    const docxBuffer = Buffer.from(docxBase64, 'base64');
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'docx_render_'));
+    const tmpDocxPath = path.join(tmpDir, 'document.docx');
+    const outDir = path.join(tmpDir, 'output');
+    fs.mkdirSync(outDir, { recursive: true });
+    fs.writeFileSync(tmpDocxPath, docxBuffer);
+
+    const scriptPath = path.resolve(__dirname, 'scripts', 'exportDocxPages.ps1');
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        execFile(
+          'powershell.exe',
+          [
+            '-NoProfile',
+            '-ExecutionPolicy',
+            'Bypass',
+            '-File',
+            scriptPath,
+            tmpDocxPath,
+            outDir,
+            width.toString(),
+            height.toString(),
+          ],
+          { timeout: 60000 },
+          (error, stdout, stderr) => {
+            if (error) {
+              console.warn('Word COM Export warning:', stderr || stdout || error.message);
+              return reject(new Error(stderr || stdout || error.message));
+            }
+            resolve();
+          }
+        );
+      });
+
+      const files = fs.readdirSync(outDir).filter((f) => f.endsWith('.png'));
+      files.sort((a, b) => {
+        const numA = parseInt(a.replace(/[^0-9]/g, '') || '0', 10);
+        const numB = parseInt(b.replace(/[^0-9]/g, '') || '0', 10);
+        return numA - numB;
+      });
+
+      const pageImages: string[] = [];
+      for (const file of files) {
+        const imgBuffer = fs.readFileSync(path.join(outDir, file));
+        pageImages.push(`data:image/png;base64,${imgBuffer.toString('base64')}`);
+      }
+
+      console.log(`📄 Word COM: Úspěšně vyrenderováno ${pageImages.length} stránek dokumentu`);
+      return res.json({
+        success: true,
+        count: pageImages.length,
+        pageImages,
+      });
+    } finally {
+      try {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+      } catch (_) {}
+    }
+  } catch (error: any) {
+    console.error('Chyba při renderování stránek přes Word:', error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || 'Nepodařilo se vyrenderovat stránky přes Word COM.',
+      pageImages: [],
+    });
+  } finally {
+    releaseLock();
+  }
+});
+
+// ---------------------------------------------------------------------------
 // Vite middleware & Server Bootstrap
 // ---------------------------------------------------------------------------
 async function startServer() {

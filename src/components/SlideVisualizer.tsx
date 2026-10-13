@@ -36,6 +36,7 @@ interface SlideVisualizerProps {
   isGalleryOpen?: boolean;
   onToggleGallery?: (open: boolean) => void;
   onExport?: () => void;
+  docType?: 'pptx' | 'docx';
 }
 
 export const SlideVisualizer: React.FC<SlideVisualizerProps> = ({
@@ -49,8 +50,12 @@ export const SlideVisualizer: React.FC<SlideVisualizerProps> = ({
   isGalleryOpen,
   onToggleGallery,
   onExport,
+  docType,
 }) => {
   const { t } = useLanguage();
+  const currentSlide =
+    slides.find((s) => s.slideNumber === currentSlideNumber) || slides[0];
+  const isWord = docType === 'docx' || (currentSlide && currentSlide.aspectRatio > 0 && currentSlide.aspectRatio < 1);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isProjectionMode, setIsProjectionMode] = useState(false);
   const [viewMode, setViewMode] = useState<'authentic' | 'overlay' | 'wireframe'>('overlay');
@@ -63,9 +68,6 @@ export const SlideVisualizer: React.FC<SlideVisualizerProps> = ({
     setLocalGridOpen(open);
     if (onToggleGallery) onToggleGallery(open);
   };
-
-  const currentSlide =
-    slides.find((s) => s.slideNumber === currentSlideNumber) || slides[0];
 
   const prevSlide = () => {
     if (currentSlideNumber > 1) {
@@ -303,12 +305,12 @@ export const SlideVisualizer: React.FC<SlideVisualizerProps> = ({
                         : 'bg-slate-900/60 border-slate-800 hover:border-slate-700 hover:bg-slate-800/60'
                     }`}
                   >
-                    {/* Thumbnail Viewport (16:9 ratio) */}
-                    <div className="relative w-full aspect-[16/9] rounded-lg overflow-hidden bg-slate-800 shadow-xs border border-slate-800/80">
+                    {/* Thumbnail Viewport (aspect ratio: 16:9 for PPTX, A4 210:297 for Word) */}
+                    <div className={`relative w-full ${isWord ? 'aspect-[210/297]' : 'aspect-[16/9]'} rounded-lg overflow-hidden bg-slate-800 shadow-xs border border-slate-800/80`}>
                       {s.renderedImageDataUrl ? (
                         <img
                           src={s.renderedImageDataUrl}
-                          alt={`Snímek ${s.slideNumber}`}
+                          alt={`${isWord ? 'Stránka' : 'Snímek'} ${s.slideNumber}`}
                           className="w-full h-full object-cover select-none pointer-events-none"
                           loading="lazy"
                         />
@@ -337,7 +339,7 @@ export const SlideVisualizer: React.FC<SlideVisualizerProps> = ({
                       )}
                     </div>
 
-                    {/* Slide Caption */}
+                    {/* Slide / Page Caption */}
                     <div className="mt-1.5 flex items-center justify-between text-[11px]">
                       <span
                         className={`truncate font-semibold ${
@@ -345,7 +347,7 @@ export const SlideVisualizer: React.FC<SlideVisualizerProps> = ({
                         }`}
                         title={s.title}
                       >
-                        {s.title || `Snímek ${s.slideNumber}`}
+                        {s.title || `${isWord ? 'Stránka' : 'Snímek'} ${s.slideNumber}`}
                       </span>
                     </div>
                   </div>
@@ -357,39 +359,43 @@ export const SlideVisualizer: React.FC<SlideVisualizerProps> = ({
 
         {/* CENTER SLIDE CANVAS AREA */}
         <div className="flex-1 w-full h-full min-h-0 min-w-0 overflow-auto flex items-center justify-center p-3 sm:p-6 bg-slate-950/90 relative">
-          {/* Floating PowerPoint Render Status Banner */}
+          {/* Floating Render Status Banner */}
           {isRendering && (
             <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 bg-slate-900/95 backdrop-blur-md border border-blue-500/60 px-4 py-2 rounded-full shadow-2xl flex items-center gap-2.5 text-xs text-blue-200 pointer-events-none animate-pulse">
               <RotateCw className="w-4 h-4 text-blue-400 animate-spin" />
-              <span className="font-semibold">Načítám věrný náhled z Microsoft PowerPointu (šablona a grafika)...</span>
+              <span className="font-semibold">
+                {isWord
+                  ? 'Načítám věrný náhled z Microsoft Wordu (stránky a formátování)...'
+                  : 'Načítám věrný náhled z Microsoft PowerPointu (šablona a grafika)...'}
+              </span>
             </div>
           )}
 
-          {/* Slide Stage Container with Authentic 16:9 Aspect Ratio */}
+          {/* Slide / Page Stage Container */}
           <div
-            className={`relative w-full max-w-5xl shadow-2xl rounded-xl overflow-hidden select-none transition-transform ${
+            className={`relative w-full ${isWord ? 'max-w-xl' : 'max-w-5xl'} shadow-2xl rounded-xl overflow-hidden select-none transition-transform ${
               isProjectionMode
                 ? 'ring-4 ring-orange-500/30 max-w-6xl shadow-orange-950/50'
                 : 'ring-1 ring-slate-800'
             }`}
             style={{
               backgroundColor: currentSlide.backgroundColor || '#ffffff',
-              aspectRatio: '16 / 9',
+              aspectRatio: isWord ? '210 / 297' : '16 / 9',
               transform: zoomLevel !== 100 ? `scale(${zoomLevel / 100})` : undefined,
               transformOrigin: 'center center',
             }}
           >
-            {/* Structural 16:9 spacer ensuring container never collapses */}
+            {/* Structural spacer ensuring container never collapses */}
             <svg
-              viewBox="0 0 1920 1080"
+              viewBox={isWord ? '0 0 1600 2260' : '0 0 1920 1080'}
               className="w-full h-auto block pointer-events-none invisible select-none"
               aria-hidden="true"
             />
-            {/* 1. True PowerPoint Full HD Slide Image Background */}
+            {/* 1. True Full HD Slide / Document Image Background */}
             {currentSlide.renderedImageDataUrl ? (
               <img
                 src={currentSlide.renderedImageDataUrl}
-                alt={`Snímek ${currentSlide.slideNumber} - PowerPoint náhled`}
+                alt={`${isWord ? 'Stránka' : 'Snímek'} ${currentSlide.slideNumber} - ${isWord ? 'Word' : 'PowerPoint'} náhled`}
                 className="absolute inset-0 w-full h-full object-contain pointer-events-none select-none z-0"
               />
             ) : currentSlide.backgroundImageDataUrl ? (

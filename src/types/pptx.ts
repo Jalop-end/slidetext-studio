@@ -19,7 +19,7 @@ export interface PptxParagraph {
   shapeId: string;
   paragraphIndex: number;
   shapeName: string;
-  shapeRole: 'title' | 'subtitle' | 'body' | 'table-cell' | 'shape' | 'footer';
+  shapeRole: 'title' | 'subtitle' | 'body' | 'table-cell' | 'shape' | 'footer' | 'header' | 'quote' | 'list-item';
   originalText: string;
   currentText: string;
   runs: PptxRun[];
@@ -43,7 +43,7 @@ export interface PptxParagraph {
 export interface PptxShape {
   id: string;
   name: string;
-  role: 'title' | 'subtitle' | 'body' | 'table-cell' | 'shape' | 'footer';
+  role: 'title' | 'subtitle' | 'body' | 'table-cell' | 'shape' | 'footer' | 'header' | 'quote' | 'list-item';
   bounds: {
     x: number; // percentage 0-100
     y: number; // percentage 0-100
@@ -91,6 +91,7 @@ export interface PptxSlide {
 }
 
 export interface PptxDocument {
+  docType?: 'pptx' | 'docx';
   fileName: string;
   fileSize: number;
   slides: PptxSlide[];

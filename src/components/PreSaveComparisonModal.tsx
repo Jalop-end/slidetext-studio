@@ -36,13 +36,14 @@ export const PreSaveComparisonModal: React.FC<PreSaveComparisonModalProps> = ({
   isExporting,
 }) => {
   const { t } = useLanguage();
+  const isWord = document.docType === 'docx';
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [outputFileName, setOutputFileName] = useState(
-    document.fileName.replace(/\.pptx$/i, '') + '_upraveno'
+    document.fileName.replace(/\.(pptx|docx)$/i, '') + '_upraveno'
   );
 
   useEffect(() => {
-    setOutputFileName(document.fileName.replace(/\.pptx$/i, '') + '_upraveno');
+    setOutputFileName(document.fileName.replace(/\.(pptx|docx)$/i, '') + '_upraveno');
   }, [document.fileName]);
 
   if (!isOpen) return null;
@@ -409,9 +410,9 @@ export const PreSaveComparisonModal: React.FC<PreSaveComparisonModalProps> = ({
                 value={outputFileName}
                 onChange={(e) => setOutputFileName(e.target.value)}
                 className="bg-slate-950 text-xs font-bold text-white px-2 py-1 rounded-lg border border-slate-700 focus:outline-none focus:border-orange-500 w-36 sm:w-56"
-                placeholder={t('presentationNamePlaceholder', 'Název prezentace')}
+                placeholder={isWord ? 'Název dokumentu' : t('presentationNamePlaceholder', 'Název prezentace')}
               />
-              <span className="text-xs text-slate-400 font-mono">.pptx</span>
+              <span className="text-xs text-slate-400 font-mono">{isWord ? '.docx' : '.pptx'}</span>
             </div>
 
             <button
@@ -429,7 +430,11 @@ export const PreSaveComparisonModal: React.FC<PreSaveComparisonModalProps> = ({
                 onClose();
               }}
               disabled={isExporting}
-              className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-orange-600/25 transition-all active:scale-95 disabled:opacity-50"
+              className={`px-5 py-2.5 rounded-xl text-white font-bold text-xs flex items-center gap-2 shadow-lg transition-all active:scale-95 disabled:opacity-50 ${
+                isWord
+                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-blue-600/25'
+                  : 'bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 shadow-orange-600/25'
+              }`}
             >
               <Download className="w-4 h-4" />
               <span>{t('confirmAndDownload')}</span>

@@ -64,13 +64,17 @@ export const Header: React.FC<HeaderProps> = ({
   const [tempName, setTempName] = useState(document.fileName.replace(/\.pptx$/i, ''));
   const [isLangMenuOpen, setIsLangMenuOpen] = useState(false);
 
+  const isWord = document.docType === 'docx';
+
   useEffect(() => {
-    setTempName(document.fileName.replace(/\.pptx$/i, ''));
+    setTempName(document.fileName.replace(/\.(pptx|docx)$/i, ''));
   }, [document.fileName]);
 
   const handleSaveName = () => {
     if (tempName.trim() && onRenameDocument) {
-      const finalName = tempName.trim().endsWith('.pptx') ? tempName.trim() : `${tempName.trim()}.pptx`;
+      const ext = isWord ? '.docx' : '.pptx';
+      const clean = tempName.trim().replace(/\.(pptx|docx)$/i, '');
+      const finalName = `${clean}${ext}`;
       onRenameDocument(finalName);
     }
     setIsEditingName(false);
@@ -95,7 +99,14 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="flex items-center justify-between min-h-[3.5rem] py-2 gap-2 sm:gap-4 flex-wrap sm:flex-nowrap">
           {/* Left: Logo & Document Title (Constrained with truncate to prevent overlapping) */}
           <div className="flex items-center gap-2 sm:gap-3 min-w-0 max-w-full sm:max-w-[65%]">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-amber-600 to-orange-500 flex items-center justify-center text-white shadow-xs shrink-0">
+            <div
+              className={`w-8 h-8 rounded-lg flex items-center justify-center text-white shadow-xs shrink-0 ${
+                isWord
+                  ? 'bg-gradient-to-tr from-blue-600 to-indigo-600'
+                  : 'bg-gradient-to-tr from-amber-600 to-orange-500'
+              }`}
+              title={isWord ? 'Microsoft Word (.docx)' : 'PowerPoint (.pptx)'}
+            >
               <FileText className="w-4 h-4" />
             </div>
 
@@ -146,8 +157,19 @@ export const Header: React.FC<HeaderProps> = ({
 
               {/* Status Badges */}
               <div className="hidden xs:flex items-center gap-1.5 shrink-0">
+                {isWord ? (
+                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-semibold border border-blue-200 flex items-center gap-1">
+                    <FileText className="w-3 h-3 text-blue-600" />
+                    DOCX • Word
+                  </span>
+                ) : (
+                  <span className="text-[11px] px-2 py-0.5 rounded-full bg-orange-50 text-orange-700 font-semibold border border-orange-200 flex items-center gap-1">
+                    PPTX • Prezentace
+                  </span>
+                )}
+
                 <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium">
-                  {document.slides.length} {t('slidesCount')}
+                  {document.slides.length} {isWord ? (document.slides.length === 1 ? 'stránka' : document.slides.length < 5 ? 'stránky' : 'stránek') : t('slidesCount')}
                 </span>
 
                 {modifiedCount > 0 ? (
@@ -222,14 +244,18 @@ export const Header: React.FC<HeaderProps> = ({
               )}
             </div>
 
-            {/* Save & Download PPTX Button */}
+            {/* Save & Download Button */}
             <button
               onClick={onExport}
               disabled={isExporting}
-              className="px-3 sm:px-4 py-1.5 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white font-bold text-xs rounded-lg flex items-center gap-1.5 shadow-sm shadow-orange-600/20 active:scale-95 transition-all disabled:opacity-50 shrink-0"
+              className={`px-3 sm:px-4 py-1.5 text-white font-bold text-xs rounded-lg flex items-center gap-1.5 shadow-sm active:scale-95 transition-all disabled:opacity-50 shrink-0 ${
+                isWord
+                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-blue-600/20'
+                  : 'bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 shadow-orange-600/20'
+              }`}
             >
               <Download className="w-3.5 h-3.5" />
-              <span className="hidden md:inline">{t('saveAndDownload')} (.pptx)</span>
+              <span className="hidden md:inline">{t('saveAndDownload')} {isWord ? '(.docx)' : '(.pptx)'}</span>
               <span className="md:hidden">{t('saveAndDownload')}</span>
             </button>
           </div>
@@ -296,9 +322,9 @@ export const Header: React.FC<HeaderProps> = ({
                     ? 'bg-white text-slate-900 shadow-xs font-semibold'
                     : 'hover:text-slate-900'
                 }`}
-                title={t('slideOnly')}
+                title={isWord ? 'Pouze náhled stránky' : t('slideOnly')}
               >
-                {t('slideOnly')}
+                {isWord ? 'Náhled stránky' : t('slideOnly')}
               </button>
             </div>
           </div>
